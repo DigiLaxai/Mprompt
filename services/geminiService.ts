@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 
 // Initialize the Google Gemini AI client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
@@ -32,3 +32,23 @@ export const generatePromptFromImage = async (image: Image): Promise<string> => 
 
     return response.text.trim();
 }
+
+export const generateImageFromPrompt = async (prompt: string): Promise<string> => {
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: {
+            parts: [{ text: prompt }],
+        },
+        config: {
+            responseModalities: [Modality.IMAGE],
+        },
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+            return part.inlineData.data; // This is the base64 image string
+        }
+    }
+
+    throw new Error("Image generation failed: no image data received.");
+};

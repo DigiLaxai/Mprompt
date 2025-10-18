@@ -4,11 +4,13 @@ import { PromptInput } from './components/PromptInput';
 import { Spinner } from './components/Spinner';
 import { Footer } from './components/Footer';
 import { HistorySidebar } from './components/HistorySidebar';
-import { generatePromptFromImage } from './services/geminiService';
+import { generatePromptFromImage, generateImageFromPrompt } from './services/geminiService';
 import { ErrorBanner } from './components/ErrorBanner';
 import { HistoryItem, getHistory, saveHistory } from './utils/history';
 import { CopyIcon } from './components/icons/CopyIcon';
 import { CheckIcon } from './components/icons/CheckIcon';
+import { WandIcon } from './components/icons/WandIcon';
+import { GeneratedImageModal } from './components/GeneratedImageModal';
 
 type Stage = 'UPLOADING' | 'PROMPTING';
 
@@ -28,6 +30,10 @@ const App: React.FC = () => {
   const [selectedStyle, setSelectedStyle] = useState(ART_STYLES[0]);
   
   const [isLoadingPrompt, setIsLoadingPrompt] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
   
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -136,6 +142,23 @@ const App: React.FC = () => {
     });
   }, [editablePrompt]);
 
+  const handleGenerateImage = useCallback(async () => {
+    if (!editablePrompt) return;
+
+    setIsGeneratingImage(true);
+    setError(null);
+    try {
+        const imageData = await generateImageFromPrompt(editablePrompt);
+        setGeneratedImage(imageData);
+        setIsImageModalOpen(true);
+    } catch (err: any) {
+        setError(err.message || 'Failed to generate image.');
+    } finally {
+        setIsGeneratingImage(false);
+    }
+  }, [editablePrompt]);
+
+
   const handleClearError = () => setError(null);
 
   return (
@@ -148,6 +171,13 @@ const App: React.FC = () => {
         history={history}
         onLoad={loadFromHistory}
         onClear={handleClearHistory}
+      />
+
+      <GeneratedImageModal
+        isOpen={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        imageData={generatedImage}
+        prompt={editablePrompt}
       />
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
@@ -224,7 +254,7 @@ const App: React.FC = () => {
                 <button
                   onClick={handleCopy}
                   disabled={!editablePrompt.trim()}
-                  className="w-full sm:flex-grow flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-all duration-300 ease-in-out"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-700 text-slate-200 font-bold py-3 px-6 rounded-lg hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed disabled:text-slate-500 transition-colors"
                 >
                   {isCopied ? (
                     <>
@@ -235,6 +265,26 @@ const App: React.FC = () => {
                     <>
                       <CopyIcon className="w-5 h-5" />
                       Copy Prompt
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleGenerateImage}
+                  disabled={!editablePrompt.trim() || isGeneratingImage}
+                  className="w-full sm:flex-grow flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-all duration-300 ease-in-out"
+                >
+                  {isGeneratingImage ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Generating Image...
+                    </>
+                  ) : (
+                    <>
+                      <WandIcon className="w-5 h-5" />
+                      Generate Image
                     </>
                   )}
                 </button>

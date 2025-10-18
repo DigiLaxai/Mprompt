@@ -29,7 +29,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ isOpen, onClose,
           
           {history.length === 0 ? (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
-                <p className="text-slate-500">Your generated images will appear here.</p>
+                <p className="text-slate-500">Your prompt history will appear here.</p>
             </div>
           ) : (
             <div className="flex-grow overflow-y-auto p-4 space-y-3">
