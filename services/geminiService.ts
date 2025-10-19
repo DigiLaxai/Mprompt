@@ -1,13 +1,13 @@
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
-class RateLimitError extends Error {
+export class RateLimitError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'RateLimitError';
   }
 }
 
-class ApiKeyError extends Error {
+export class ApiKeyError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'ApiKeyError';
@@ -30,7 +30,7 @@ const handleApiError = (error: any) => {
             throw new ApiKeyError('Your API Key is invalid or lacks permissions. Please check it and try again.');
         }
         if (message.includes('429') || message.includes('quota')) {
-            throw new RateLimitError("You've exceeded your request limit (quota). Please wait a moment or check your billing status with Google AI Studio.");
+            throw new RateLimitError("The API's free tier has a per-minute request limit. Please wait 60 seconds and try again.");
         }
     }
     // For other errors, throw a generic message
@@ -72,29 +72,3 @@ export const generatePromptFromImage = async (image: Image, apiKey: string): Pro
         return ""; // Should not be reached due to handleApiError throwing
     }
 }
-
-export const generateImageFromPrompt = async (prompt: string, apiKey: string): Promise<string> => {
-    try {
-        const ai = getAiClient(apiKey);
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: {
-                parts: [{ text: prompt }],
-            },
-            config: {
-                responseModalities: [Modality.IMAGE],
-            },
-        });
-
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
-                return part.inlineData.data; // This is the base64 image string
-            }
-        }
-
-        throw new Error("Image generation failed: no image data received.");
-    } catch (error) {
-        handleApiError(error);
-        return ""; // Should not be reached
-    }
-};

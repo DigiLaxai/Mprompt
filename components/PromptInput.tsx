@@ -10,9 +10,18 @@ interface PromptInputProps {
   onCreatePrompt: () => void;
   isLoading: boolean;
   isApiKeySet: boolean;
+  isRateLimited: boolean;
 }
 
-export const PromptInput: React.FC<PromptInputProps> = ({ image, onImageChange, onImageRemove, onCreatePrompt, isLoading, isApiKeySet }) => {
+export const PromptInput: React.FC<PromptInputProps> = ({ 
+  image, 
+  onImageChange, 
+  onImageRemove, 
+  onCreatePrompt, 
+  isLoading, 
+  isApiKeySet,
+  isRateLimited
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageUploadClick = () => {
@@ -60,7 +69,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({ image, onImageChange, 
           </div>
           <button
             onClick={onCreatePrompt}
-            disabled={isLoading || !isApiKeySet}
+            disabled={isLoading || !isApiKeySet || isRateLimited}
             className="w-full flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-all duration-300"
           >
             {isLoading ? (
@@ -71,6 +80,8 @@ export const PromptInput: React.FC<PromptInputProps> = ({ image, onImageChange, 
                 </svg>
                 Analyzing Image...
               </>
+            ) : isRateLimited ? (
+              'API Limit Reached'
             ) : (
               <>
                 <WandIcon className="w-5 h-5" />

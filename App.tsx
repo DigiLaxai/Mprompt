@@ -4,13 +4,11 @@ import { PromptInput } from './components/PromptInput';
 import { Spinner } from './components/Spinner';
 import { Footer } from './components/Footer';
 import { HistorySidebar } from './components/HistorySidebar';
-import { generatePromptFromImage, generateImageFromPrompt } from './services/geminiService';
+import { generatePromptFromImage, RateLimitError, ApiKeyError } from './services/geminiService';
 import { ErrorBanner } from './components/ErrorBanner';
 import { HistoryItem, getHistory, saveHistory } from './utils/history';
 import { CopyIcon } from './components/icons/CopyIcon';
 import { CheckIcon } from './components/icons/CheckIcon';
-import { WandIcon } from './components/icons/WandIcon';
-import { GeneratedImageModal } from './components/GeneratedImageModal';
 import { ApiKeyModal } from './components/ApiKeyModal';
 
 const API_KEY_STORAGE_KEY = 'gemini-api-key';
@@ -19,6 +17,7 @@ const SEEN_API_MODAL_KEY = 'seen-api-modal';
 type Stage = 'UPLOADING' | 'PROMPTING';
 
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
+const COOLDOWN_DURATION = 60; // 60 seconds
 
 const getStyleSuffix = (style: string): string => {
   if (!style || style === 'None') {
@@ -36,15 +35,15 @@ const App: React.FC = () => {
   const [selectedStyle, setSelectedStyle] = useState(ART_STYLES[0]);
   
   const [isLoadingPrompt, setIsLoadingPrompt] = useState(false);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+
+  const [isRateLimited, setIsRateLimited] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   useEffect(() => {
     const savedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
@@ -58,6 +57,19 @@ const App: React.FC = () => {
     }
     setHistory(getHistory());
   }, []);
+
+  useEffect(() => {
+    if (isRateLimited && cooldownSeconds > 0) {
+      const timer = setInterval(() => {
+        setCooldownSeconds((prev) => prev - 1);
+      }, 1000);
+      return () => clearInterval(timer);
+    } else if (isRateLimited && cooldownSeconds <= 0) {
+      setIsRateLimited(false);
+      setError(null); // Clear the rate limit message
+    }
+  }, [isRateLimited, cooldownSeconds]);
+
 
   const handleSaveApiKey = (newKey: string) => {
     setApiKey(newKey);
@@ -93,7 +105,7 @@ const App: React.FC = () => {
   };
   
   const handleCreatePrompt = useCallback(async () => {
-    if (!uploadedImage) return;
+    if (!uploadedImage || isRateLimited) return;
     if (!apiKey) {
       setError('API Key is not set. Please add your key in the settings.');
       setIsApiKeyModalOpen(true);
@@ -121,15 +133,21 @@ const App: React.FC = () => {
 
       setStage('PROMPTING');
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
-      if (err.name === 'ApiKeyError') {
+      if (err instanceof RateLimitError) {
+        setError(err.message);
+        setIsRateLimited(true);
+        setCooldownSeconds(COOLDOWN_DURATION);
+      } else if (err instanceof ApiKeyError) {
+        setError(err.message);
         setIsApiKeyModalOpen(true);
+      } else {
+        setError(err.message || 'An unexpected error occurred.');
       }
       setStage('UPLOADING');
     } finally {
       setIsLoadingPrompt(false);
     }
-  }, [uploadedImage, history, apiKey]);
+  }, [uploadedImage, history, apiKey, isRateLimited]);
 
   const handleStyleChange = (newStyle: string) => {
     const oldSuffix = getStyleSuffix(selectedStyle);
@@ -150,6 +168,8 @@ const App: React.FC = () => {
     setSelectedStyle(ART_STYLES[0]);
     setStage('UPLOADING');
     setError(null);
+    setIsRateLimited(false);
+    setCooldownSeconds(0);
   };
 
   const loadFromHistory = (item: HistoryItem) => {
@@ -176,31 +196,6 @@ const App: React.FC = () => {
     });
   }, [editablePrompt]);
 
-  const handleGenerateImage = useCallback(async () => {
-    if (!editablePrompt) return;
-    if (!apiKey) {
-      setError('API Key is not set. Please add your key in the settings.');
-      setIsApiKeyModalOpen(true);
-      return;
-    }
-
-    setIsGeneratingImage(true);
-    setError(null);
-    try {
-        const imageData = await generateImageFromPrompt(editablePrompt, apiKey);
-        setGeneratedImage(imageData);
-        setIsImageModalOpen(true);
-    } catch (err: any) {
-        setError(err.message || 'An unexpected error occurred.');
-        if (err.name === 'ApiKeyError') {
-          setIsApiKeyModalOpen(true);
-        }
-    } finally {
-        setIsGeneratingImage(false);
-    }
-  }, [editablePrompt, apiKey]);
-
-
   const handleClearError = () => setError(null);
 
   return (
@@ -215,13 +210,6 @@ const App: React.FC = () => {
         onClear={handleClearHistory}
       />
 
-      <GeneratedImageModal
-        isOpen={isImageModalOpen}
-        onClose={() => setIsImageModalOpen(false)}
-        imageData={generatedImage}
-        prompt={editablePrompt}
-      />
-
       <ApiKeyModal
         isOpen={isApiKeyModalOpen}
         onClose={handleCloseApiKeyModal}
@@ -232,7 +220,7 @@ const App: React.FC = () => {
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         <div className="max-w-3xl mx-auto">
           {error && (
-            <ErrorBanner message={error} onDismiss={handleClearError} />
+            <ErrorBanner message={error} onDismiss={isRateLimited ? () => {} : handleClearError} />
           )}
           
           {stage === 'UPLOADING' && (
@@ -243,6 +231,7 @@ const App: React.FC = () => {
               onCreatePrompt={handleCreatePrompt}
               isLoading={isLoadingPrompt}
               isApiKeySet={!!apiKey}
+              isRateLimited={isRateLimited}
             />
           )}
 
@@ -304,7 +293,7 @@ const App: React.FC = () => {
                 <button
                   onClick={handleCopy}
                   disabled={!editablePrompt.trim()}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-700 text-slate-200 font-bold py-3 px-6 rounded-lg hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed disabled:text-slate-500 transition-colors"
+                  className="w-full sm:flex-grow flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-6 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-colors"
                 >
                   {isCopied ? (
                     <>
@@ -315,26 +304,6 @@ const App: React.FC = () => {
                     <>
                       <CopyIcon className="w-5 h-5" />
                       Copy Prompt
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={handleGenerateImage}
-                  disabled={!editablePrompt.trim() || isGeneratingImage || !apiKey}
-                  className="w-full sm:flex-grow flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-all duration-300 ease-in-out"
-                >
-                  {isGeneratingImage ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Generating Image...
-                    </>
-                  ) : (
-                    <>
-                      <WandIcon className="w-5 h-5" />
-                      {apiKey ? 'Generate Image' : 'Set API Key to Generate'}
                     </>
                   )}
                 </button>
