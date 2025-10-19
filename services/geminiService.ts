@@ -1,8 +1,12 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
-// Initialize the Google Gemini AI client
-// FIX: Use process.env.API_KEY as per guidelines, which fixes the TypeScript error.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+// Lazy initialization of the Google Gemini AI client
+const getAiClient = () => {
+    // This will be called only when a function needs it, preventing a startup crash.
+    // NOTE: This will still throw an error if process.env.API_KEY is not available
+    // when an API call is made.
+    return new GoogleGenAI({ apiKey: process.env.API_KEY! });
+}
 
 const imagePromptingSystemInstruction = `You are an expert at analyzing images and creating descriptive prompts for AI image generation. Describe the provided image in vivid detail. Cover the main subject, the background/setting, the artistic style (e.g., photorealistic, illustration, painting), the lighting, the color palette, composition, and overall mood. The description must be a single, coherent paragraph suitable for use as a prompt for a text-to-image AI model. Do not add any preamble or explanation.`;
 
@@ -12,6 +16,7 @@ interface Image {
 }
 
 export const generatePromptFromImage = async (image: Image): Promise<string> => {
+    const ai = getAiClient();
     const contents = {
         parts: [{
             inlineData: {
@@ -35,6 +40,7 @@ export const generatePromptFromImage = async (image: Image): Promise<string> => 
 }
 
 export const generateImageFromPrompt = async (prompt: string): Promise<string> => {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: {
