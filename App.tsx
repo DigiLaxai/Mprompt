@@ -11,6 +11,10 @@ import { CopyIcon } from './components/icons/CopyIcon';
 import { CheckIcon } from './components/icons/CheckIcon';
 import { WandIcon } from './components/icons/WandIcon';
 import { GeneratedImageModal } from './components/GeneratedImageModal';
+import { ApiKeyModal } from './components/ApiKeyModal';
+
+const API_KEY_STORAGE_KEY = 'gemini-api-key';
+const SEEN_API_MODAL_KEY = 'seen-api-modal';
 
 type Stage = 'UPLOADING' | 'PROMPTING';
 
@@ -24,6 +28,8 @@ const getStyleSuffix = (style: string): string => {
 };
 
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string>('');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [stage, setStage] = useState<Stage>('UPLOADING');
   const [editablePrompt, setEditablePrompt] = useState('');
@@ -41,8 +47,28 @@ const App: React.FC = () => {
   const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
+    const savedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+    if (savedKey) {
+      setApiKey(savedKey);
+    } else {
+      const hasSeenModal = sessionStorage.getItem(SEEN_API_MODAL_KEY);
+      if (!hasSeenModal) {
+        setIsApiKeyModalOpen(true);
+      }
+    }
     setHistory(getHistory());
   }, []);
+
+  const handleSaveApiKey = (newKey: string) => {
+    setApiKey(newKey);
+    localStorage.setItem(API_KEY_STORAGE_KEY, newKey);
+    setError(null); // Clear any previous key-related errors
+  };
+
+  const handleCloseApiKeyModal = () => {
+    setIsApiKeyModalOpen(false);
+    sessionStorage.setItem(SEEN_API_MODAL_KEY, 'true');
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -68,11 +94,16 @@ const App: React.FC = () => {
   
   const handleCreatePrompt = useCallback(async () => {
     if (!uploadedImage) return;
+    if (!apiKey) {
+      setError('API Key is not set. Please add your key in the settings.');
+      setIsApiKeyModalOpen(true);
+      return;
+    }
 
     setIsLoadingPrompt(true);
     setError(null);
     try {
-      const prompt = await generatePromptFromImage(uploadedImage);
+      const prompt = await generatePromptFromImage(uploadedImage, apiKey);
       const defaultStyle = ART_STYLES[0];
       
       setEditablePrompt(prompt + getStyleSuffix(defaultStyle));
@@ -90,12 +121,15 @@ const App: React.FC = () => {
 
       setStage('PROMPTING');
     } catch (err: any) {
-      setError(err.message || 'Failed to generate prompt from image.');
+      setError(err.message || 'An unexpected error occurred.');
+      if (err.name === 'ApiKeyError') {
+        setIsApiKeyModalOpen(true);
+      }
       setStage('UPLOADING');
     } finally {
       setIsLoadingPrompt(false);
     }
-  }, [uploadedImage, history]);
+  }, [uploadedImage, history, apiKey]);
 
   const handleStyleChange = (newStyle: string) => {
     const oldSuffix = getStyleSuffix(selectedStyle);
@@ -144,26 +178,34 @@ const App: React.FC = () => {
 
   const handleGenerateImage = useCallback(async () => {
     if (!editablePrompt) return;
+    if (!apiKey) {
+      setError('API Key is not set. Please add your key in the settings.');
+      setIsApiKeyModalOpen(true);
+      return;
+    }
 
     setIsGeneratingImage(true);
     setError(null);
     try {
-        const imageData = await generateImageFromPrompt(editablePrompt);
+        const imageData = await generateImageFromPrompt(editablePrompt, apiKey);
         setGeneratedImage(imageData);
         setIsImageModalOpen(true);
     } catch (err: any) {
-        setError(err.message || 'Failed to generate image.');
+        setError(err.message || 'An unexpected error occurred.');
+        if (err.name === 'ApiKeyError') {
+          setIsApiKeyModalOpen(true);
+        }
     } finally {
         setIsGeneratingImage(false);
     }
-  }, [editablePrompt]);
+  }, [editablePrompt, apiKey]);
 
 
   const handleClearError = () => setError(null);
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
-      <Header onHistoryClick={() => setIsHistoryOpen(true)} />
+      <Header onHistoryClick={() => setIsHistoryOpen(true)} onSettingsClick={() => setIsApiKeyModalOpen(true)} />
       
       <HistorySidebar 
         isOpen={isHistoryOpen} 
@@ -180,6 +222,13 @@ const App: React.FC = () => {
         prompt={editablePrompt}
       />
 
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={handleCloseApiKeyModal}
+        onSave={handleSaveApiKey}
+        currentApiKey={apiKey}
+      />
+
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         <div className="max-w-3xl mx-auto">
           {error && (
@@ -193,6 +242,7 @@ const App: React.FC = () => {
               onImageRemove={handleImageRemove}
               onCreatePrompt={handleCreatePrompt}
               isLoading={isLoadingPrompt}
+              isApiKeySet={!!apiKey}
             />
           )}
 
@@ -270,12 +320,12 @@ const App: React.FC = () => {
                 </button>
                 <button
                   onClick={handleGenerateImage}
-                  disabled={!editablePrompt.trim() || isGeneratingImage}
+                  disabled={!editablePrompt.trim() || isGeneratingImage || !apiKey}
                   className="w-full sm:flex-grow flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-all duration-300 ease-in-out"
                 >
                   {isGeneratingImage ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
@@ -284,7 +334,7 @@ const App: React.FC = () => {
                   ) : (
                     <>
                       <WandIcon className="w-5 h-5" />
-                      Generate Image
+                      {apiKey ? 'Generate Image' : 'Set API Key to Generate'}
                     </>
                   )}
                 </button>
