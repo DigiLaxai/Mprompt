@@ -4,15 +4,14 @@ import { PromptInput } from './components/PromptInput';
 import { Spinner } from './components/Spinner';
 import { Footer } from './components/Footer';
 import { HistorySidebar } from './components/HistorySidebar';
-import { generatePromptFromImage, RateLimitError, ApiKeyError } from './services/geminiService';
+import { generatePromptFromImage, generateImageFromPrompt, RateLimitError, ApiKeyError } from './services/geminiService';
 import { ErrorBanner } from './components/ErrorBanner';
 import { HistoryItem, getHistory, saveHistory } from './utils/history';
 import { CopyIcon } from './components/icons/CopyIcon';
 import { CheckIcon } from './components/icons/CheckIcon';
 import { ApiKeyPrompt } from './components/ApiKeyPrompt';
-
-// FIX: Removed redundant `declare global` block for `window.aistudio` to fix type conflict.
-// The type is likely defined in a global typings file.
+import { GeneratedImageModal } from './components/GeneratedImageModal';
+import { WandIcon } from './components/icons/WandIcon';
 
 type Stage = 'UPLOADING' | 'PROMPTING';
 
@@ -36,6 +35,9 @@ const App: React.FC = () => {
   const [selectedStyle, setSelectedStyle] = useState(ART_STYLES[0]);
   
   const [isLoadingPrompt, setIsLoadingPrompt] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [generatedImageData, setGeneratedImageData] = useState<string | null>(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   
@@ -70,7 +72,7 @@ const App: React.FC = () => {
       return () => clearInterval(timer);
     } else if (isRateLimited && cooldownSeconds <= 0) {
       setIsRateLimited(false);
-      setError(null); // Clear the rate limit message
+      setError(null);
     }
   }, [isRateLimited, cooldownSeconds]);
 
@@ -82,7 +84,7 @@ const App: React.FC = () => {
       reader.onloadend = () => {
         const base64String = (reader.result as string).split(',')[1];
         setUploadedImage({ data: base64String, mimeType: file.type });
-        setStage('UPLOADING'); // Reset stage if a new image is uploaded
+        setStage('UPLOADING');
         setEditablePrompt('');
         setError(null);
       };
@@ -127,7 +129,7 @@ const App: React.FC = () => {
         setCooldownSeconds(COOLDOWN_DURATION);
       } else if (err instanceof ApiKeyError) {
         setError(err.message);
-        setIsKeyConfigured(false); // Key is invalid, prompt user to select a new one
+        setIsKeyConfigured(false);
       } else {
         setError(err.message || 'An unexpected error occurred.');
       }
@@ -136,6 +138,34 @@ const App: React.FC = () => {
       setIsLoadingPrompt(false);
     }
   }, [uploadedImage, history, isRateLimited]);
+
+  const handleGenerateImage = useCallback(async () => {
+    if (!editablePrompt.trim() || isRateLimited) return;
+
+    setIsGeneratingImage(true);
+    setGeneratedImageData(null);
+    setIsImageModalOpen(true);
+    setError(null);
+
+    try {
+        const imageData = await generateImageFromPrompt(editablePrompt);
+        setGeneratedImageData(imageData);
+    } catch (err: any) {
+       if (err instanceof RateLimitError) {
+        setError(err.message);
+        setIsRateLimited(true);
+        setCooldownSeconds(COOLDOWN_DURATION);
+      } else if (err instanceof ApiKeyError) {
+        setError(err.message);
+        setIsKeyConfigured(false);
+      } else {
+        setError(err.message || 'An unexpected error occurred.');
+      }
+      setIsImageModalOpen(false); // Close modal on error
+    } finally {
+        setIsGeneratingImage(false);
+    }
+  }, [editablePrompt, isRateLimited]);
 
   const handleStyleChange = (newStyle: string) => {
     const oldSuffix = getStyleSuffix(selectedStyle);
@@ -158,6 +188,8 @@ const App: React.FC = () => {
     setError(null);
     setIsRateLimited(false);
     setCooldownSeconds(0);
+    setGeneratedImageData(null);
+    setIsImageModalOpen(false);
   };
 
   const loadFromHistory = (item: HistoryItem) => {
@@ -189,7 +221,6 @@ const App: React.FC = () => {
   const handleSelectKey = async () => {
     try {
       await window.aistudio.openSelectKey();
-      // Assume success and optimistically update the UI
       setIsKeyConfigured(true);
       setError(null);
     } catch (e) {
@@ -220,6 +251,14 @@ const App: React.FC = () => {
         history={history}
         onLoad={loadFromHistory}
         onClear={handleClearHistory}
+      />
+
+      <GeneratedImageModal 
+        isOpen={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        imageData={generatedImageData}
+        prompt={editablePrompt}
+        isLoading={isGeneratingImage}
       />
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
@@ -275,7 +314,7 @@ const App: React.FC = () => {
               
               <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
                 <label htmlFor="prompt-editor" className="block text-lg font-semibold text-slate-300 mb-3">
-                  3. Your Generated Prompt
+                  3. Refine Your Prompt
                 </label>
                 <textarea
                   id="prompt-editor"
@@ -287,29 +326,44 @@ const App: React.FC = () => {
                 />
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row-reverse gap-4">
                  <button
-                  onClick={handleStartOver}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-700 text-slate-200 font-bold py-3 px-6 rounded-lg hover:bg-slate-600 transition-colors"
+                  onClick={handleGenerateImage}
+                  disabled={isGeneratingImage || !editablePrompt.trim()}
+                  className="w-full sm:flex-grow flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-6 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-colors"
                 >
-                  Start Over
+                  {isGeneratingImage ? (
+                     <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Generating...
+                    </>
+                  ) : (
+                    <>
+                      <WandIcon className="w-5 h-5" />
+                      Generate Image
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={handleCopy}
                   disabled={!editablePrompt.trim()}
-                  className="w-full sm:flex-grow flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-6 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-colors"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-700 text-slate-200 font-bold py-3 px-6 rounded-lg hover:bg-slate-600 transition-colors"
                 >
                   {isCopied ? (
-                    <>
-                      <CheckIcon className="w-5 h-5" />
-                      Copied!
-                    </>
+                    <CheckIcon className="w-5 h-5" />
                   ) : (
-                    <>
-                      <CopyIcon className="w-5 h-5" />
-                      Copy Prompt
-                    </>
+                    <CopyIcon className="w-5 h-5" />
                   )}
+                  {isCopied ? 'Copied!' : 'Copy Prompt'}
+                </button>
+                 <button
+                  onClick={handleStartOver}
+                  className="w-full sm:w-auto flex items-center justify-center text-slate-400 font-bold py-3 px-6 rounded-lg hover:bg-slate-700/50 transition-colors"
+                >
+                  Start Over
                 </button>
               </div>
             </div>

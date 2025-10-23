@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 
 export class RateLimitError extends Error {
   constructor(message: string) {
@@ -20,7 +20,6 @@ const handleApiError = (error: any) => {
     }
     if (error?.message) {
         const message = error.message.toLowerCase();
-        // Detect errors that indicate an invalid or incorrectly configured API key.
         if (message.includes('api key not valid') || message.includes('permission denied') || message.includes('api_key') || message.includes('requested entity was not found')) {
             throw new ApiKeyError('Your API Key is invalid or missing required permissions. Please select a new key.');
         }
@@ -28,7 +27,6 @@ const handleApiError = (error: any) => {
             throw new RateLimitError("The API's free tier has a per-minute request limit. Please wait 60 seconds and try again.");
         }
     }
-    // For other errors, throw a generic message
     throw new Error(error?.message || 'An unknown error occurred with the Gemini API.');
 }
 
@@ -41,7 +39,6 @@ interface Image {
 
 export const generatePromptFromImage = async (image: Image): Promise<string> => {
     try {
-        // Create a new client instance for each request to ensure the latest key is used.
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
         const contents = {
@@ -66,6 +63,34 @@ export const generatePromptFromImage = async (image: Image): Promise<string> => 
         return response.text.trim();
     } catch (error) {
         handleApiError(error);
-        return ""; // Should not be reached due to handleApiError throwing
+        return "";
+    }
+}
+
+export const generateImageFromPrompt = async (prompt: string): Promise<string> => {
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: {
+                parts: [{ text: prompt }],
+            },
+            config: {
+                responseModalities: [Modality.IMAGE],
+            },
+        });
+
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+                return part.inlineData.data;
+            }
+        }
+
+        throw new Error('No image data was found in the API response.');
+
+    } catch (error) {
+        handleApiError(error);
+        return "";
     }
 }

@@ -1,22 +1,23 @@
 import React from 'react';
 import { DownloadIcon } from './icons/DownloadIcon';
 import { CloseIcon } from './icons/CloseIcon';
+import { Spinner } from './Spinner';
 
 interface GeneratedImageModalProps {
   isOpen: boolean;
   onClose: () => void;
   imageData: string | null;
   prompt: string;
+  isLoading: boolean;
 }
 
-export const GeneratedImageModal: React.FC<GeneratedImageModalProps> = ({ isOpen, onClose, imageData, prompt }) => {
+export const GeneratedImageModal: React.FC<GeneratedImageModalProps> = ({ isOpen, onClose, imageData, prompt, isLoading }) => {
   if (!isOpen) return null;
 
   const handleDownload = () => {
     if (!imageData) return;
     const link = document.createElement('a');
     link.href = `data:image/png;base64,${imageData}`;
-    // Create a filename from the prompt
     const filename = prompt.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-').slice(0, 50) || 'generated-image';
     link.download = `${filename}.png`;
     document.body.appendChild(link);
@@ -37,8 +38,13 @@ export const GeneratedImageModal: React.FC<GeneratedImageModalProps> = ({ isOpen
             </button>
         </div>
         
-        <div className="flex-grow p-6 overflow-y-auto">
-          {imageData ? (
+        <div className="flex-grow p-6 overflow-y-auto min-h-[200px] flex items-center justify-center">
+          {isLoading ? (
+            <div className='text-center'>
+              <Spinner />
+              <p className="text-slate-400 mt-4">Generating your vision...</p>
+            </div>
+          ) : imageData ? (
             <div className="space-y-6">
                 <img
                     src={`data:image/png;base64,${imageData}`}
@@ -51,16 +57,15 @@ export const GeneratedImageModal: React.FC<GeneratedImageModalProps> = ({ isOpen
                 </div>
             </div>
           ) : (
-             <p className="text-center text-slate-400">Something went wrong. No image data available.</p>
+             <p className="text-center text-slate-400">Image generation failed. Please try again.</p>
           )}
         </div>
         
-        {imageData && (
+        {imageData && !isLoading && (
             <div className="p-4 border-t border-slate-700">
                 <button
                     onClick={handleDownload}
-                    disabled={!imageData}
-                    className="w-full flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed transition-all"
+                    className="w-full flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-yellow-400 transition-all"
                 >
                     <DownloadIcon className="w-5 h-5" />
                     Download Image
