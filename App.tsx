@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { PromptInput } from './components/PromptInput';
@@ -10,6 +11,9 @@ import { CheckIcon } from './components/icons/CheckIcon';
 import { WandIcon } from './components/icons/WandIcon';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { DownloadIcon } from './components/icons/DownloadIcon';
+import { HistorySidebar } from './components/HistorySidebar';
+import { getHistory, addToHistory, clearHistory, HistoryItem } from './utils/history';
+
 
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
 
@@ -22,6 +26,8 @@ const App: React.FC = () => {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [prompt, setPrompt] = useState('');
@@ -42,6 +48,7 @@ const App: React.FC = () => {
       } else {
         setIsApiKeyModalOpen(true);
       }
+      setHistory(getHistory());
     } catch (e) {
       console.error("Could not access localStorage", e);
       setIsApiKeyModalOpen(true);
@@ -101,6 +108,8 @@ const App: React.FC = () => {
     try {
       const imageData = await generateImageFromPrompt(prompt, apiKey);
       setGeneratedImageData(imageData);
+      const newHistory = addToHistory({ prompt, imageData });
+      setHistory(newHistory);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred.');
       if (err.message.toLowerCase().includes('api key')) {
@@ -153,19 +162,46 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const handleSelectHistoryItem = (item: HistoryItem) => {
+    setUploadedImage(null);
+    setPrompt(item.prompt);
+    setGeneratedImageData(item.imageData);
+    setSelectedStyle(ART_STYLES.find(s => getStyleSuffix(s) && item.prompt.endsWith(getStyleSuffix(s))) || 'None');
+    setError(null);
+    setIsHistoryOpen(false);
+  };
+
+  const handleClearHistory = () => {
+    clearHistory();
+    setHistory([]);
+    setIsHistoryOpen(false);
+  };
+
+
   if (isLoading) {
     return <div className="bg-slate-900 min-h-screen flex items-center justify-center"><Spinner /></div>;
   }
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
-      <Header onSettingsClick={() => setIsApiKeyModalOpen(true)} />
+      <Header 
+        onSettingsClick={() => setIsApiKeyModalOpen(true)}
+        onHistoryClick={() => setIsHistoryOpen(true)}
+      />
       
       <ApiKeyModal 
         isOpen={isApiKeyModalOpen}
         onClose={() => { if(apiKey) setIsApiKeyModalOpen(false) }}
         onSave={handleApiKeySave}
         currentKey={apiKey}
+      />
+
+      <HistorySidebar
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        history={history}
+        onSelect={handleSelectHistoryItem}
+        onClear={handleClearHistory}
       />
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
