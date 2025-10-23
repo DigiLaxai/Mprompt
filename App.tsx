@@ -9,10 +9,6 @@ import { ErrorBanner } from './components/ErrorBanner';
 import { HistoryItem, getHistory, saveHistory } from './utils/history';
 import { CopyIcon } from './components/icons/CopyIcon';
 import { CheckIcon } from './components/icons/CheckIcon';
-import { ApiKeyModal } from './components/ApiKeyModal';
-
-const API_KEY_STORAGE_KEY = 'gemini-api-key';
-const SEEN_API_MODAL_KEY = 'seen-api-modal';
 
 type Stage = 'UPLOADING' | 'PROMPTING';
 
@@ -27,8 +23,6 @@ const getStyleSuffix = (style: string): string => {
 };
 
 const App: React.FC = () => {
-  const [apiKey, setApiKey] = useState<string>('');
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [stage, setStage] = useState<Stage>('UPLOADING');
   const [editablePrompt, setEditablePrompt] = useState('');
@@ -46,15 +40,6 @@ const App: React.FC = () => {
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   useEffect(() => {
-    const savedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-    if (savedKey) {
-      setApiKey(savedKey);
-    } else {
-      const hasSeenModal = sessionStorage.getItem(SEEN_API_MODAL_KEY);
-      if (!hasSeenModal) {
-        setIsApiKeyModalOpen(true);
-      }
-    }
     setHistory(getHistory());
   }, []);
 
@@ -70,17 +55,6 @@ const App: React.FC = () => {
     }
   }, [isRateLimited, cooldownSeconds]);
 
-
-  const handleSaveApiKey = (newKey: string) => {
-    setApiKey(newKey);
-    localStorage.setItem(API_KEY_STORAGE_KEY, newKey);
-    setError(null); // Clear any previous key-related errors
-  };
-
-  const handleCloseApiKeyModal = () => {
-    setIsApiKeyModalOpen(false);
-    sessionStorage.setItem(SEEN_API_MODAL_KEY, 'true');
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -106,16 +80,11 @@ const App: React.FC = () => {
   
   const handleCreatePrompt = useCallback(async () => {
     if (!uploadedImage || isRateLimited) return;
-    if (!apiKey) {
-      setError('API Key is not set. Please add your key in the settings.');
-      setIsApiKeyModalOpen(true);
-      return;
-    }
 
     setIsLoadingPrompt(true);
     setError(null);
     try {
-      const prompt = await generatePromptFromImage(uploadedImage, apiKey);
+      const prompt = await generatePromptFromImage(uploadedImage);
       const defaultStyle = ART_STYLES[0];
       
       setEditablePrompt(prompt + getStyleSuffix(defaultStyle));
@@ -138,8 +107,7 @@ const App: React.FC = () => {
         setIsRateLimited(true);
         setCooldownSeconds(COOLDOWN_DURATION);
       } else if (err instanceof ApiKeyError) {
-        setError(err.message);
-        setIsApiKeyModalOpen(true);
+        setError("There is a configuration issue with the application. Please contact the developer.");
       } else {
         setError(err.message || 'An unexpected error occurred.');
       }
@@ -147,7 +115,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoadingPrompt(false);
     }
-  }, [uploadedImage, history, apiKey, isRateLimited]);
+  }, [uploadedImage, history, isRateLimited]);
 
   const handleStyleChange = (newStyle: string) => {
     const oldSuffix = getStyleSuffix(selectedStyle);
@@ -200,7 +168,7 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
-      <Header onHistoryClick={() => setIsHistoryOpen(true)} onSettingsClick={() => setIsApiKeyModalOpen(true)} />
+      <Header onHistoryClick={() => setIsHistoryOpen(true)} />
       
       <HistorySidebar 
         isOpen={isHistoryOpen} 
@@ -208,13 +176,6 @@ const App: React.FC = () => {
         history={history}
         onLoad={loadFromHistory}
         onClear={handleClearHistory}
-      />
-
-      <ApiKeyModal
-        isOpen={isApiKeyModalOpen}
-        onClose={handleCloseApiKeyModal}
-        onSave={handleSaveApiKey}
-        currentApiKey={apiKey}
       />
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
@@ -230,7 +191,6 @@ const App: React.FC = () => {
               onImageRemove={handleImageRemove}
               onCreatePrompt={handleCreatePrompt}
               isLoading={isLoadingPrompt}
-              isApiKeySet={!!apiKey}
               isRateLimited={isRateLimited}
             />
           )}

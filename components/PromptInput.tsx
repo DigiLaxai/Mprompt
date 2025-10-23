@@ -9,7 +9,6 @@ interface PromptInputProps {
   onImageRemove: () => void;
   onCreatePrompt: () => void;
   isLoading: boolean;
-  isApiKeySet: boolean;
   isRateLimited: boolean;
 }
 
@@ -19,7 +18,6 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   onImageRemove, 
   onCreatePrompt, 
   isLoading, 
-  isApiKeySet,
   isRateLimited
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,7 +67,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
           </div>
           <button
             onClick={onCreatePrompt}
-            disabled={isLoading || !isApiKeySet || isRateLimited}
+            disabled={isLoading || isRateLimited}
             className="w-full flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-all duration-300"
           >
             {isLoading ? (
@@ -85,7 +83,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
             ) : (
               <>
                 <WandIcon className="w-5 h-5" />
-                {isApiKeySet ? 'Create Prompt from Image' : 'Set API Key to Continue'}
+                Create Prompt from Image
               </>
             )}
           </button>

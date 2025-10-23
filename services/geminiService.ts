@@ -14,20 +14,26 @@ export class ApiKeyError extends Error {
   }
 }
 
-const getAiClient = (apiKey: string) => {
+// The API key is now sourced from environment variables, not user input.
+const getAiClient = () => {
+    // The API key is injected by the environment.
+    const apiKey = process.env.API_KEY;
     if (!apiKey) {
-        throw new ApiKeyError("API Key is missing. Please provide a valid API key.");
+        // This error is for the developer, not the end-user.
+        throw new ApiKeyError("API Key is not configured in the application environment.");
     }
     return new GoogleGenAI({ apiKey });
 }
 
 const handleApiError = (error: any) => {
-    // The Gemini SDK throws errors that have a `message` property.
-    // We can inspect this message to provide more specific feedback.
+    if (error instanceof ApiKeyError) {
+        throw error; // Re-throw the specific developer-facing error.
+    }
     if (error?.message) {
         const message = error.message.toLowerCase();
+        // This error is for the developer, as the user can't fix an invalid key.
         if (message.includes('api key not valid') || message.includes('permission denied') || message.includes('api_key')) {
-            throw new ApiKeyError('Your API Key is invalid or lacks permissions. Please check it and try again.');
+            throw new ApiKeyError('The application\'s API Key is invalid or lacks permissions.');
         }
         if (message.includes('429') || message.includes('quota')) {
             throw new RateLimitError("The API's free tier has a per-minute request limit. Please wait 60 seconds and try again.");
@@ -44,9 +50,9 @@ interface Image {
     mimeType: string;
 }
 
-export const generatePromptFromImage = async (image: Image, apiKey: string): Promise<string> => {
+export const generatePromptFromImage = async (image: Image): Promise<string> => {
     try {
-        const ai = getAiClient(apiKey);
+        const ai = getAiClient();
         const contents = {
             parts: [{
                 inlineData: {
