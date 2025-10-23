@@ -20,7 +20,8 @@ export class ApiKeyError extends Error {
 // IMPORTANT: This makes your API key visible in the client-side code.
 // This is suitable for demos or internal tools, but for a public-facing
 // application, it's recommended to use a backend proxy to secure your key.
-const DEVELOPER_API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE";
+const DEVELOPER_API_KEY = "AIzaSyCtzifAMAmO1tUFQ5Y1UKXCywz55Q14wBc
+";
 
 
 const getAiClient = () => {
