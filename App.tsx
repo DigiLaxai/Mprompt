@@ -107,7 +107,7 @@ const App: React.FC = () => {
         setIsRateLimited(true);
         setCooldownSeconds(COOLDOWN_DURATION);
       } else if (err instanceof ApiKeyError) {
-        setError("There is a configuration issue with the application. Please contact the developer.");
+        setError(err.message); // Display the specific developer instruction
       } else {
         setError(err.message || 'An unexpected error occurred.');
       }
