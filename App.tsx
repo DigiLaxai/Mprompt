@@ -49,18 +49,42 @@ const App: React.FC = () => {
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   useEffect(() => {
-    const checkApiKey = async () => {
-      try {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        setIsKeyConfigured(hasKey);
-      } catch (e) {
-        console.error("Error checking for API key:", e);
-        setIsKeyConfigured(false);
-      } finally {
-        setCheckingKey(false);
-      }
+    // This function robustly checks for the API key by waiting for the 
+    // AI Studio environment to be ready.
+    const initialize = () => {
+      let attempts = 0;
+      const maxAttempts = 10;
+      const intervalTime = 300; // ms
+
+      const checkForKey = async () => {
+        try {
+          // window.aistudio is injected by the environment.
+          const hasKey = await window.aistudio.hasSelectedApiKey();
+          setIsKeyConfigured(hasKey);
+        } catch (e) {
+          console.error("Error checking for API key:", e);
+          setIsKeyConfigured(false);
+        } finally {
+          setCheckingKey(false);
+        }
+      };
+
+      const intervalId = setInterval(() => {
+        if (window.aistudio) {
+          clearInterval(intervalId);
+          checkForKey();
+        } else {
+          attempts++;
+          if (attempts >= maxAttempts) {
+            clearInterval(intervalId);
+            setError("Could not connect to the AI Studio environment. Please try refreshing the page.");
+            setCheckingKey(false);
+          }
+        }
+      }, intervalTime);
     };
-    checkApiKey();
+
+    initialize();
     setHistory(getHistory());
   }, []);
 
@@ -219,13 +243,20 @@ const App: React.FC = () => {
   const handleClearError = () => setError(null);
 
   const handleSelectKey = async () => {
+    // Guard clause to ensure the AI Studio environment is ready.
+    if (!window.aistudio) {
+      setError("AI Studio environment is not available. Please refresh the page.");
+      return;
+    }
     try {
       await window.aistudio.openSelectKey();
+      // Per documentation, assume success after the dialog closes without an error.
       setIsKeyConfigured(true);
       setError(null);
     } catch (e) {
       console.error("Error opening key selection:", e);
-      setError("Failed to open the API key selection dialog.");
+      // Provide a more helpful error message.
+      setError("Failed to open the API key selection dialog. Please check your browser's pop-up blocker settings and try again.");
     }
   };
 
@@ -334,7 +365,7 @@ const App: React.FC = () => {
                 >
                   {isGeneratingImage ? (
                      <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
