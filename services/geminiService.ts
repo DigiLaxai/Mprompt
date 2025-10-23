@@ -14,33 +14,15 @@ export class ApiKeyError extends Error {
   }
 }
 
-// --- DEVELOPER ACTION REQUIRED ---
-// To make this app work for your clients, replace the placeholder below
-// with your actual Google Gemini API key.
-// IMPORTANT: This makes your API key visible in the client-side code.
-// This is suitable for demos or internal tools, but for a public-facing
-// application, it's recommended to use a backend proxy to secure your key.
-const DEVELOPER_API_KEY = "AIzaSyCtzifAMAmO1tUFQ5Y1UKXCywz55Q14wBc
-";
-
-
-const getAiClient = () => {
-    if (!DEVELOPER_API_KEY || DEVELOPER_API_KEY === "PASTE_YOUR_GEMINI_API_KEY_HERE") {
-        // This error is for the developer, not the end-user.
-        throw new ApiKeyError("Developer action required: Please open services/geminiService.ts and replace the placeholder API key with your own.");
-    }
-    return new GoogleGenAI({ apiKey: DEVELOPER_API_KEY });
-}
-
 const handleApiError = (error: any) => {
     if (error instanceof ApiKeyError) {
-        throw error; // Re-throw the specific developer-facing error.
+        throw error;
     }
     if (error?.message) {
         const message = error.message.toLowerCase();
-        // This error is for the developer, as the user can't fix an invalid key.
-        if (message.includes('api key not valid') || message.includes('permission denied') || message.includes('api_key')) {
-            throw new ApiKeyError('The application\'s API Key is invalid or lacks permissions. Please check the key in services/geminiService.ts.');
+        // Detect errors that indicate an invalid or incorrectly configured API key.
+        if (message.includes('api key not valid') || message.includes('permission denied') || message.includes('api_key') || message.includes('requested entity was not found')) {
+            throw new ApiKeyError('Your API Key is invalid or missing required permissions. Please select a new key.');
         }
         if (message.includes('429') || message.includes('quota')) {
             throw new RateLimitError("The API's free tier has a per-minute request limit. Please wait 60 seconds and try again.");
@@ -59,7 +41,9 @@ interface Image {
 
 export const generatePromptFromImage = async (image: Image): Promise<string> => {
     try {
-        const ai = getAiClient();
+        // Create a new client instance for each request to ensure the latest key is used.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        
         const contents = {
             parts: [{
                 inlineData: {
@@ -71,7 +55,7 @@ export const generatePromptFromImage = async (image: Image): Promise<string> => 
         ]};
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.5-flash-image",
             contents,
             config: {
                 systemInstruction: imagePromptingSystemInstruction,

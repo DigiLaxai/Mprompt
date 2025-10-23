@@ -9,6 +9,10 @@ import { ErrorBanner } from './components/ErrorBanner';
 import { HistoryItem, getHistory, saveHistory } from './utils/history';
 import { CopyIcon } from './components/icons/CopyIcon';
 import { CheckIcon } from './components/icons/CheckIcon';
+import { ApiKeyPrompt } from './components/ApiKeyPrompt';
+
+// FIX: Removed redundant `declare global` block for `window.aistudio` to fix type conflict.
+// The type is likely defined in a global typings file.
 
 type Stage = 'UPLOADING' | 'PROMPTING';
 
@@ -23,6 +27,9 @@ const getStyleSuffix = (style: string): string => {
 };
 
 const App: React.FC = () => {
+  const [isKeyConfigured, setIsKeyConfigured] = useState(false);
+  const [checkingKey, setCheckingKey] = useState(true);
+
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [stage, setStage] = useState<Stage>('UPLOADING');
   const [editablePrompt, setEditablePrompt] = useState('');
@@ -40,6 +47,18 @@ const App: React.FC = () => {
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   useEffect(() => {
+    const checkApiKey = async () => {
+      try {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        setIsKeyConfigured(hasKey);
+      } catch (e) {
+        console.error("Error checking for API key:", e);
+        setIsKeyConfigured(false);
+      } finally {
+        setCheckingKey(false);
+      }
+    };
+    checkApiKey();
     setHistory(getHistory());
   }, []);
 
@@ -107,7 +126,8 @@ const App: React.FC = () => {
         setIsRateLimited(true);
         setCooldownSeconds(COOLDOWN_DURATION);
       } else if (err instanceof ApiKeyError) {
-        setError(err.message); // Display the specific developer instruction
+        setError(err.message);
+        setIsKeyConfigured(false); // Key is invalid, prompt user to select a new one
       } else {
         setError(err.message || 'An unexpected error occurred.');
       }
@@ -165,6 +185,30 @@ const App: React.FC = () => {
   }, [editablePrompt]);
 
   const handleClearError = () => setError(null);
+
+  const handleSelectKey = async () => {
+    try {
+      await window.aistudio.openSelectKey();
+      // Assume success and optimistically update the UI
+      setIsKeyConfigured(true);
+      setError(null);
+    } catch (e) {
+      console.error("Error opening key selection:", e);
+      setError("Failed to open the API key selection dialog.");
+    }
+  };
+
+  if (checkingKey) {
+    return (
+      <div className="bg-slate-900 min-h-screen flex items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (!isKeyConfigured) {
+    return <ApiKeyPrompt onSelectKey={handleSelectKey} error={error} />;
+  }
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
