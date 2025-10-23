@@ -7,24 +7,14 @@ export class RateLimitError extends Error {
   }
 }
 
-export class ApiKeyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ApiKeyError';
-  }
-}
-
 const handleApiError = (error: any) => {
-    if (error instanceof ApiKeyError) {
-        throw error;
-    }
     if (error?.message) {
         const message = error.message.toLowerCase();
-        if (message.includes('api key not valid') || message.includes('permission denied') || message.includes('api_key') || message.includes('requested entity was not found')) {
-            throw new ApiKeyError('Your API Key is invalid or missing required permissions. Please select a new key.');
+        if (message.includes('api key not valid') || message.includes('permission denied') || message.includes('api_key') || message.includes('invalid')) {
+            throw new Error('Your API Key is invalid or missing required permissions. Please check your key in the settings.');
         }
         if (message.includes('429') || message.includes('quota')) {
-            throw new RateLimitError("The API's free tier has a per-minute request limit. Please wait 60 seconds and try again.");
+            throw new RateLimitError("You've exceeded the API's free tier limit. Please wait a moment and try again.");
         }
     }
     throw new Error(error?.message || 'An unknown error occurred with the Gemini API.');
@@ -37,9 +27,9 @@ interface Image {
     mimeType: string;
 }
 
-export const generatePromptFromImage = async (image: Image): Promise<string> => {
+export const generatePromptFromImage = async (image: Image, apiKey: string): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         
         const contents = {
             parts: [{
@@ -63,13 +53,13 @@ export const generatePromptFromImage = async (image: Image): Promise<string> => 
         return response.text.trim();
     } catch (error) {
         handleApiError(error);
-        return "";
+        return ""; // Should not be reached
     }
 }
 
-export const generateImageFromPrompt = async (prompt: string): Promise<string> => {
+export const generateImageFromPrompt = async (prompt: string, apiKey: string): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
@@ -91,6 +81,6 @@ export const generateImageFromPrompt = async (prompt: string): Promise<string> =
 
     } catch (error) {
         handleApiError(error);
-        return "";
+        return ""; // Should not be reached
     }
 }
