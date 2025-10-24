@@ -9,7 +9,6 @@ import { ErrorBanner } from './components/ErrorBanner';
 import { CopyIcon } from './components/icons/CopyIcon';
 import { CheckIcon } from './components/icons/CheckIcon';
 import { WandIcon } from './components/icons/WandIcon';
-import { ApiKeyModal } from './components/ApiKeyModal';
 import { DownloadIcon } from './components/icons/DownloadIcon';
 import { HistorySidebar } from './components/HistorySidebar';
 import { getHistory, addToHistory, clearHistory, HistoryItem } from './utils/history';
@@ -23,9 +22,6 @@ const getStyleSuffix = (style: string): string => {
 };
 
 const App: React.FC = () => {
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
@@ -41,30 +37,8 @@ const App: React.FC = () => {
   const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
-    try {
-      const storedKey = localStorage.getItem('gemini-api-key');
-      if (storedKey) {
-        setApiKey(storedKey);
-      } else {
-        setIsApiKeyModalOpen(true);
-      }
-      setHistory(getHistory());
-    } catch (e) {
-      console.error("Could not access localStorage", e);
-      setIsApiKeyModalOpen(true);
-    } finally {
-      setIsLoading(false);
-    }
+    setHistory(getHistory());
   }, []);
-
-  const handleApiKeySave = (key: string) => {
-    if (key) {
-      setApiKey(key);
-      localStorage.setItem('gemini-api-key', key);
-      setIsApiKeyModalOpen(false);
-      setError(null);
-    }
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -80,45 +54,39 @@ const App: React.FC = () => {
   };
 
   const handleCreatePrompt = useCallback(async () => {
-    if (!uploadedImage || !apiKey) return;
+    if (!uploadedImage) return;
 
     setIsGeneratingPrompt(true);
     setError(null);
     try {
-      const generated = await generatePromptFromImage(uploadedImage, apiKey);
+      const generated = await generatePromptFromImage(uploadedImage);
       const defaultStyle = ART_STYLES[0];
       setPrompt(generated + getStyleSuffix(defaultStyle));
       setSelectedStyle(defaultStyle);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred.');
-      if (err.message.toLowerCase().includes('api key')) {
-        setIsApiKeyModalOpen(true);
-      }
     } finally {
       setIsGeneratingPrompt(false);
     }
-  }, [uploadedImage, apiKey]);
+  }, [uploadedImage]);
 
   const handleGenerateImage = useCallback(async () => {
-    if (!prompt.trim() || !apiKey) return;
+    if (!prompt.trim()) return;
 
     setIsGeneratingImage(true);
     setGeneratedImageData(null);
     setError(null);
     try {
-      const imageData = await generateImageFromPrompt(prompt, apiKey);
+      const imageData = await generateImageFromPrompt(prompt);
       setGeneratedImageData(imageData);
       const newHistory = addToHistory({ prompt, imageData });
       setHistory(newHistory);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred.');
-      if (err.message.toLowerCase().includes('api key')) {
-        setIsApiKeyModalOpen(true);
-      }
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [prompt, apiKey]);
+  }, [prompt]);
 
   const handleStyleChange = (newStyle: string) => {
     const oldSuffix = getStyleSuffix(selectedStyle);
@@ -177,23 +145,10 @@ const App: React.FC = () => {
     setIsHistoryOpen(false);
   };
 
-
-  if (isLoading) {
-    return <div className="bg-slate-900 min-h-screen flex items-center justify-center"><Spinner /></div>;
-  }
-
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
       <Header 
-        onSettingsClick={() => setIsApiKeyModalOpen(true)}
         onHistoryClick={() => setIsHistoryOpen(true)}
-      />
-      
-      <ApiKeyModal 
-        isOpen={isApiKeyModalOpen}
-        onClose={() => { if(apiKey) setIsApiKeyModalOpen(false) }}
-        onSave={handleApiKeySave}
-        currentKey={apiKey}
       />
 
       <HistorySidebar
