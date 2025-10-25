@@ -86,7 +86,25 @@ export default async function handler(req: any, res: any) {
                 },
             });
 
-            return res.status(200).json({ result: JSON.parse(response.text) });
+            const firstCandidate = response.candidates?.[0];
+            if (!firstCandidate) {
+                 throw new Error('The AI model did not provide a response. This might be due to a network issue or an internal error.');
+            }
+            if (firstCandidate.finishReason && firstCandidate.finishReason !== 'STOP') {
+                throw new Error(`Prompt generation failed. Reason: ${firstCandidate.finishReason}. Please check your input image for any policy violations.`);
+            }
+
+            const text = response.text;
+            if (!text) {
+                throw new Error('The AI model returned an empty response.');
+            }
+            
+            try {
+                return res.status(200).json({ result: JSON.parse(text) });
+            } catch (e) {
+                console.error("Failed to parse JSON response from AI:", text);
+                throw new Error("The AI returned a response that was not in the expected format.");
+            }
 
         } else if (action === 'generateImage') {
             if (!prompt) {
@@ -110,15 +128,28 @@ export default async function handler(req: any, res: any) {
             });
 
             const firstCandidate = response.candidates?.[0];
-            if (firstCandidate?.content?.parts) {
+            if (!firstCandidate) {
+                throw new Error('The AI model did not provide a response. This might be due to a network issue or an internal error.');
+            }
+
+            if (firstCandidate.finishReason && firstCandidate.finishReason !== 'STOP') {
+                throw new Error(`Image generation failed. Reason: ${firstCandidate.finishReason}. Please check your prompt for any policy violations.`);
+            }
+
+            if (firstCandidate.content?.parts) {
                 for (const part of firstCandidate.content.parts) {
-                    if (part.inlineData) {
+                    if (part.inlineData?.data) {
                         return res.status(200).json({ result: part.inlineData.data });
                     }
                 }
             }
             
-            throw new Error('No image data was found in the API response.');
+            const textExplanation = firstCandidate.content?.parts?.find(p => p.text)?.text;
+            if (textExplanation) {
+                 throw new Error(`The model did not return an image. It responded with: "${textExplanation}"`);
+            }
+            
+            throw new Error('No image data was found in the API response. The response may have been blocked or empty.');
 
         } else {
             return res.status(400).json({ error: 'Invalid action specified.' });
@@ -127,6 +158,6 @@ export default async function handler(req: any, res: any) {
     } catch (error: any) {
         console.error("Error in API proxy:", error);
         // A more generic error message is safer for the client.
-        res.status(500).json({ error: 'An internal server error occurred while communicating with the AI service.' });
+        res.status(500).json({ error: error.message || 'An internal server error occurred while communicating with the AI service.' });
     }
 }
