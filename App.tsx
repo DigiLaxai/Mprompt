@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { PromptInput } from './components/PromptInput';
@@ -21,7 +22,9 @@ declare global {
     openSelectKey: () => Promise<void>;
   }
   interface Window {
-    aistudio: AIStudio;
+    // FIX: Made `aistudio` optional to resolve declaration conflict errors.
+    // This aligns with runtime checks for its existence.
+    aistudio?: AIStudio;
   }
 }
 
@@ -76,10 +79,14 @@ const App: React.FC = () => {
 
   const handleSelectKey = async () => {
     try {
-      await window.aistudio.openSelectKey();
-      // Assume success and re-render the app
-      setHasApiKey(true);
-      setError(null);
+      // FIX: Added a check for window.aistudio to prevent runtime errors
+      // and satisfy TypeScript's strict null checks since it's now optional.
+      if (window.aistudio) {
+        await window.aistudio.openSelectKey();
+        // Assume success and re-render the app
+        setHasApiKey(true);
+        setError(null);
+      }
     } catch (e) {
       console.error("Error opening API key selection:", e);
       setError("Could not open the API key selection dialog.");

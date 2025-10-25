@@ -17,17 +17,6 @@ export const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({ onSelectKey }) =
             >
                 Select API Key
             </button>
-            <p className="text-xs text-slate-500 mt-4">
-                For more information on billing, please see the{' '}
-                <a
-                    href="https://ai.google.dev/gemini-api/docs/billing"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline hover:text-yellow-400"
-                >
-                    billing documentation
-                </a>.
-            </p>
         </div>
     );
 };
