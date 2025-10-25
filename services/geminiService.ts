@@ -27,12 +27,11 @@ const promptSchema = {
     required: ['subject', 'setting', 'style', 'lighting', 'colors', 'composition', 'mood'],
 };
 
-function validateApiResponse(response: GenerateContentResponse) {
-    const candidate = response.candidates?.[0];
-
-    if (!candidate) {
+function validateResponse(response: GenerateContentResponse) {
+    if (!response.candidates?.length) {
         throw new Error('The AI model did not provide a valid response.');
     }
+    const candidate = response.candidates[0];
 
     if (candidate.finishReason && candidate.finishReason !== 'STOP') {
         let errorMessage = `The model stopped generating for the following reason: ${candidate.finishReason}.`;
@@ -46,8 +45,6 @@ function validateApiResponse(response: GenerateContentResponse) {
     if (!candidate.content?.parts?.length) {
         throw new Error('The AI model returned an empty response.');
     }
-
-    return candidate;
 }
 
 const getAiClient = (apiKey: string) => {
@@ -80,8 +77,8 @@ export const generatePromptFromImage = async (apiKey: string, image: { data: str
             },
         });
 
-        const candidate = validateApiResponse(response);
-        const text = candidate.content.parts[0]?.text;
+        validateResponse(response);
+        const text = response.text;
         
         if (!text) {
             throw new Error('The AI model returned an empty text response.');
@@ -126,7 +123,8 @@ export const generateImage = async (apiKey: string, prompt: string, image: { dat
             },
         });
 
-        const candidate = validateApiResponse(response);
+        validateResponse(response);
+        const candidate = response.candidates![0];
         
         for (const part of candidate.content.parts) {
             if (part.inlineData?.data) {
