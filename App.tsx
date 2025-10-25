@@ -182,7 +182,17 @@ const App: React.FC = () => {
     if (!generatedImageData) return;
     const link = document.createElement('a');
     link.href = `data:image/png;base64,${generatedImageData}`;
-    const filename = prompt.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '-').slice(0, 50) || 'generated-image';
+    
+    // Improved multi-step sanitation for robustness
+    const sanitized = prompt
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '') // Allow letters, numbers, whitespace, hyphens
+      .replace(/\s+/g, '-')          // Replace whitespace with a single hyphen
+      .replace(/-+/g, '-')           // Collapse consecutive hyphens
+      .replace(/^-+|-+$/g, '')       // Remove leading/trailing hyphens
+      .slice(0, 50);
+
+    const filename = sanitized || 'generated-image';
     link.download = `${filename}.png`;
     document.body.appendChild(link);
     link.click();
