@@ -60,21 +60,35 @@ const processApiError = (error: any): Error => {
 
 function validateResponse(response: GenerateContentResponse) {
     if (!response.candidates?.length) {
-        throw new Error('The AI model did not provide a valid response.');
+        throw new Error('The model did not provide a valid response. This may be due to the safety policy.');
     }
     const candidate = response.candidates[0];
 
     if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-        let errorMessage = `The model stopped generating for the following reason: ${candidate.finishReason}.`;
-        if (candidate.finishReason === 'SAFETY' && candidate.safetyRatings?.length) {
-            const blockedCategories = candidate.safetyRatings.map(rating => rating.category.replace('HARM_CATEGORY_', '')).join(', ');
-            errorMessage = `Your request was blocked for safety reasons related to: ${blockedCategories}. Please adjust your input.`;
+        let errorMessage = `The model stopped generating for an unexpected reason: ${candidate.finishReason}.`;
+        switch (candidate.finishReason) {
+            case 'SAFETY':
+                const blockedCategories = candidate.safetyRatings?.filter(r => r.blocked).map(rating => rating.category.replace('HARM_CATEGORY_', '')).join(', ') || 'unspecified safety concerns';
+                errorMessage = `Your request was blocked for safety reasons related to: ${blockedCategories}. Please adjust your input.`;
+                break;
+            case 'RECITATION':
+                errorMessage = `The response was blocked because it contained content that was too similar to a source. Please try a different prompt.`;
+                break;
+            case 'MAX_TOKENS':
+                errorMessage = `The response was cut off because it reached the maximum length. Try a more concise prompt.`;
+                break;
+             case 'PROMPT_BLOCKED':
+                errorMessage = `Your prompt was blocked by the safety filter. Please modify your prompt and try again.`;
+                break;
+            default:
+                errorMessage = `The generation failed due to an unhandled reason: ${candidate.finishReason}.`;
+                break;
         }
         throw new Error(errorMessage);
     }
 
     if (!candidate.content?.parts?.length) {
-        throw new Error('The AI model returned an empty response.');
+        throw new Error('The model returned an empty response. This might be due to a content filter.');
     }
 }
 
