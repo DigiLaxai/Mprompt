@@ -37,6 +37,17 @@ export const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({ onKeySubmit }) =
                     Save and Continue
                 </button>
             </form>
+            <p className="text-sm text-slate-400 mt-6">
+                Don't have a key? Get one from{' '}
+                <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-yellow-400 font-semibold hover:underline"
+                >
+                    Google AI Studio
+                </a>.
+            </p>
         </div>
     );
 };
