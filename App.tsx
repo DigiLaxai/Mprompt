@@ -4,7 +4,7 @@ import { Header } from './components/Header';
 import { PromptInput } from './components/PromptInput';
 import { Spinner } from './components/Spinner';
 import { Footer } from './components/Footer';
-import { generatePromptFromImage, generateImage, ApiKeyNotFoundError } from './services/geminiService';
+import { generatePromptFromImage, generateImage, StructuredPrompt as FullStructuredPrompt } from './services/geminiService';
 import { ErrorBanner } from './components/ErrorBanner';
 import { CopyIcon } from './components/icons/CopyIcon';
 import { CheckIcon } from './components/icons/CheckIcon';
@@ -13,13 +13,50 @@ import { DownloadIcon } from './components/icons/DownloadIcon';
 import { HistorySidebar } from './components/HistorySidebar';
 import { getHistory, addToHistory, clearHistory, HistoryItem } from './utils/history';
 
-
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
+
+type StructuredPrompt = Omit<FullStructuredPrompt, 'style'>;
 
 const getStyleSuffix = (style: string): string => {
   if (!style || style === 'None') return '';
   return `, in the style of ${style.toLowerCase()}`;
 };
+
+const constructPromptFromObject = (p: StructuredPrompt | null, style: string): string => {
+  if (!p) return '';
+  const stylePart = getStyleSuffix(style);
+  return [
+    p.subject,
+    p.setting,
+    p.composition,
+    p.lighting,
+    `using a ${p.colors} color palette`,
+    `evoking a ${p.mood} mood`,
+    stylePart
+  ].filter(Boolean).join(', ').replace(/, ,/g, ',').trim();
+};
+
+const PromptField: React.FC<{
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  area?: boolean;
+}> = ({ label, value, onChange, area }) => {
+  const InputComponent = area ? 'textarea' : 'input';
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-slate-400 mb-1">{label}</label>
+      <InputComponent
+        type="text"
+        rows={area ? 3 : undefined}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-slate-200 focus:ring-1 focus:ring-yellow-500 focus:border-yellow-500 transition-shadow"
+      />
+    </div>
+  );
+};
+
 
 const App: React.FC = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -27,6 +64,7 @@ const App: React.FC = () => {
 
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [prompt, setPrompt] = useState('');
+  const [structuredPrompt, setStructuredPrompt] = useState<StructuredPrompt | null>(null);
   const [selectedStyle, setSelectedStyle] = useState(ART_STYLES[0]);
   
   const [isGeneratingFromImage, setIsGeneratingFromImage] = useState(false);
@@ -45,12 +83,8 @@ const App: React.FC = () => {
     try {
       return await apiFunction();
     } catch (err: any) {
-      if (err instanceof ApiKeyNotFoundError) {
-        setError("Your API Key is invalid. Please check the 'API_KEY' environment variable in your deployment settings.");
-      } else {
-        setError(err.message || 'An unexpected error occurred.');
-      }
-      throw err; // Re-throw to be caught by the calling function's finally block
+      setError(err.message || 'An unexpected error occurred.');
+      throw err;
     }
   };
 
@@ -61,6 +95,9 @@ const App: React.FC = () => {
       reader.onloadend = () => {
         const base64String = (reader.result as string).split(',')[1];
         setUploadedImage({ data: base64String, mimeType: file.type });
+        setPrompt('');
+        setStructuredPrompt(null);
+        setGeneratedImageData(null);
       };
       reader.readAsDataURL(file);
     }
@@ -71,13 +108,17 @@ const App: React.FC = () => {
 
     setIsGeneratingFromImage(true);
     setPrompt('');
+    setStructuredPrompt(null);
     try {
       const generated = await handleApiCall(() => generatePromptFromImage(uploadedImage));
-      const defaultStyle = ART_STYLES[0];
-      setPrompt(generated + getStyleSuffix(defaultStyle));
-      setSelectedStyle(defaultStyle);
+      const { style, ...rest } = generated;
+      const newStyle = style || ART_STYLES[0];
+      
+      setStructuredPrompt(rest);
+      setSelectedStyle(newStyle);
+      setPrompt(constructPromptFromObject(rest, newStyle));
     } catch (err) {
-      // Error is already handled by handleApiCall
+      // Error is handled by handleApiCall
     } finally {
       setIsGeneratingFromImage(false);
     }
@@ -89,39 +130,46 @@ const App: React.FC = () => {
     setIsGeneratingImage(true);
     setGeneratedImageData(null);
     try {
-      // Pass uploadedImage to retain the original image context for editing.
       const imageData = await handleApiCall(() => generateImage(prompt, uploadedImage));
       setGeneratedImageData(imageData);
       const newHistory = addToHistory({ prompt, imageData });
       setHistory(newHistory);
     } catch (err) {
-        // Error is already handled by handleApiCall
+        // Error is handled by handleApiCall
     } finally {
       setIsGeneratingImage(false);
     }
   }, [prompt, uploadedImage]);
 
-  const handleStyleChange = (newStyle: string) => {
-    const oldSuffix = getStyleSuffix(selectedStyle);
-    const newSuffix = getStyleSuffix(newStyle);
-    let currentBase = prompt;
-    if (oldSuffix && prompt.endsWith(oldSuffix)) {
-        currentBase = prompt.slice(0, prompt.length - oldSuffix.length);
-    }
-    setPrompt(currentBase + newSuffix);
-    setSelectedStyle(newStyle);
+  const handleStructuredPromptChange = (field: keyof StructuredPrompt, value: string) => {
+    if (!structuredPrompt) return;
+    const newStructuredPrompt = { ...structuredPrompt, [field]: value };
+    setStructuredPrompt(newStructuredPrompt);
+    setPrompt(constructPromptFromObject(newStructuredPrompt, selectedStyle));
   };
-  
-  const handleStartOver = () => {
-    setPrompt('');
-    setSelectedStyle(ART_STYLES[0]);
-    setError(null);
-    setGeneratedImageData(null);
+
+  const handleStyleChange = (newStyle: string) => {
+    if (structuredPrompt) {
+        setPrompt(constructPromptFromObject(structuredPrompt, newStyle));
+    } else {
+        const oldSuffix = getStyleSuffix(selectedStyle);
+        const newSuffix = getStyleSuffix(newStyle);
+        let currentBase = prompt;
+        if (oldSuffix && prompt.endsWith(oldSuffix)) {
+            currentBase = prompt.slice(0, prompt.length - oldSuffix.length);
+        }
+        setPrompt(currentBase + newSuffix);
+    }
+    setSelectedStyle(newStyle);
   };
   
   const handleFullReset = () => {
     setUploadedImage(null);
-    handleStartOver();
+    setPrompt('');
+    setStructuredPrompt(null);
+    setSelectedStyle(ART_STYLES[0]);
+    setError(null);
+    setGeneratedImageData(null);
   }
 
   const handleCopy = useCallback(() => {
@@ -146,8 +194,9 @@ const App: React.FC = () => {
   const handleSelectHistoryItem = (item: HistoryItem) => {
     setUploadedImage(null);
     setPrompt(item.prompt);
+    setStructuredPrompt(null); // No structured data from history
     setGeneratedImageData(item.imageData);
-    setSelectedStyle(ART_STYLES.find(s => getStyleSuffix(s) && item.prompt.endsWith(getStyleSuffix(s))) || 'None');
+    setSelectedStyle(ART_STYLES[0]); // Reset style or try to parse from prompt
     setError(null);
     setIsHistoryOpen(false);
   };
@@ -160,56 +209,79 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
-      <Header 
-        onHistoryClick={() => setIsHistoryOpen(true)}
-      />
-
-      <HistorySidebar
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        history={history}
-        onSelect={handleSelectHistoryItem}
-        onClear={handleClearHistory}
-      />
+      <Header onHistoryClick={() => setIsHistoryOpen(true)} />
+      <HistorySidebar isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} onSelect={handleSelectHistoryItem} onClear={handleClearHistory} />
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         <div className="max-w-3xl mx-auto space-y-8">
           {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
           
-          <PromptInput
-            image={uploadedImage}
-            onImageChange={handleImageChange}
-            onCreatePrompt={handleCreatePromptFromImage}
-            isLoading={isGeneratingFromImage}
-            hasPrompt={!!prompt}
-            onImageRemove={handleFullReset}
-          />
+          <PromptInput image={uploadedImage} onImageChange={handleImageChange} onCreatePrompt={handleCreatePromptFromImage} isLoading={isGeneratingFromImage} hasPrompt={!!prompt} onImageRemove={handleFullReset} />
 
           {prompt && (
             <div className="space-y-6 animate-fade-in">
               <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
-                <label className="block text-lg font-semibold text-slate-300 mb-3">
-                  1. Choose an Artistic Style
+                <label className="block text-lg font-semibold text-slate-300 mb-4">
+                  1. Refine Your Prompt
                 </label>
-                <div className="flex flex-wrap gap-3">
-                  {ART_STYLES.map(style => (
-                    <button key={style} onClick={() => handleStyleChange(style)}
-                      className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
-                        selectedStyle === style ? 'bg-yellow-500 text-slate-900 shadow-md' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                    >{style}</button>
-                  ))}
+
+                {structuredPrompt && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div className="md:col-span-2">
+                      <PromptField label="Subject" value={structuredPrompt.subject} onChange={v => handleStructuredPromptChange('subject', v)} area />
+                    </div>
+                    <div>
+                      <PromptField label="Setting" value={structuredPrompt.setting} onChange={v => handleStructuredPromptChange('setting', v)} />
+                    </div>
+                     <div>
+                      <PromptField label="Composition" value={structuredPrompt.composition} onChange={v => handleStructuredPromptChange('composition', v)} />
+                    </div>
+                    <div>
+                      <PromptField label="Lighting" value={structuredPrompt.lighting} onChange={v => handleStructuredPromptChange('lighting', v)} />
+                    </div>
+                    <div>
+                      <PromptField label="Color Palette" value={structuredPrompt.colors} onChange={v => handleStructuredPromptChange('colors', v)} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <PromptField label="Mood" value={structuredPrompt.mood} onChange={v => handleStructuredPromptChange('mood', v)} />
+                    </div>
+                  </div>
+                )}
+                
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-slate-400 mb-2">
+                    Artistic Style
+                  </label>
+                  <div className="flex flex-wrap gap-3">
+                    {ART_STYLES.map(style => (
+                      <button key={style} onClick={() => handleStyleChange(style)}
+                        className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
+                          selectedStyle === style ? 'bg-yellow-500 text-slate-900 shadow-md' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >{style}</button>
+                    ))}
+                    {selectedStyle && !ART_STYLES.includes(selectedStyle) && (
+                       <button onClick={() => handleStyleChange(selectedStyle)}
+                        className={`px-4 py-2 rounded-full text-sm font-semibold bg-yellow-500 text-slate-900 shadow-md`}
+                      >{selectedStyle} (AI)</button>
+                    )}
+                  </div>
                 </div>
-              </div>
-              
-              <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
-                <label htmlFor="prompt-editor" className="block text-lg font-semibold text-slate-300 mb-3">
-                  2. Refine Your Prompt
+
+                <label htmlFor="prompt-editor" className="block text-sm font-semibold text-slate-400 mb-2">
+                  Combined Prompt
                 </label>
                 <textarea id="prompt-editor" rows={5}
                   className="w-full bg-slate-900 border border-slate-600 rounded-lg p-4 text-slate-100 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-shadow resize-y"
-                  value={prompt} onChange={(e) => setPrompt(e.target.value)}
+                  value={prompt} 
+                  onChange={(e) => {
+                    setPrompt(e.target.value);
+                    if (structuredPrompt) {
+                      setStructuredPrompt(null);
+                    }
+                  }}
                 />
+                 {structuredPrompt && <p className="text-xs text-slate-500 mt-1">Edit the fields above or start typing here to switch to manual mode.</p>}
               </div>
 
               <div className="flex flex-col sm:flex-row-reverse gap-4">
