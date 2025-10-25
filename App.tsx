@@ -182,7 +182,7 @@ const App: React.FC = () => {
     if (!generatedImageData) return;
     const link = document.createElement('a');
     link.href = `data:image/png;base64,${generatedImageData}`;
-    const filename = prompt.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-').slice(0, 50) || 'generated-image';
+    const filename = prompt.toLowerCase().replace(/[^a-z0-g, 's']/g, '').replace(/\s+/g, '-').slice(0, 50) || 'generated-image';
     link.download = `${filename}.png`;
     document.body.appendChild(link);
     link.click();

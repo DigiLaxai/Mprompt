@@ -36,7 +36,7 @@ const processApiError = (error: any): Error => {
   if (error instanceof Error) {
     const lowerCaseMessage = error.message.toLowerCase();
     if (lowerCaseMessage.includes('api key not valid') || lowerCaseMessage.includes('permission denied')) {
-      message = 'Your API key is invalid or lacks permissions. Please check your key in the settings and try again.';
+      message = 'Your API key is invalid or lacks permissions. Please check your key and try again.';
     } else if (lowerCaseMessage.includes('quota')) {
       message = 'You have exceeded your API quota. Please check your Google AI Studio account for details.';
     } else if (lowerCaseMessage.includes('network') || lowerCaseMessage.includes('failed to fetch')) {
