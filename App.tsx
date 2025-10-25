@@ -1,9 +1,10 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { PromptInput } from './components/PromptInput';
 import { Spinner } from './components/Spinner';
 import { Footer } from './components/Footer';
-import { generatePromptFromImage, generatePromptFromText, generateImageFromPrompt, RateLimitError } from './services/geminiService';
+import { generatePromptFromImage, generateImage, ApiKeyNotFoundError } from './services/geminiService';
 import { ErrorBanner } from './components/ErrorBanner';
 import { CopyIcon } from './components/icons/CopyIcon';
 import { CheckIcon } from './components/icons/CheckIcon';
@@ -11,6 +12,7 @@ import { WandIcon } from './components/icons/WandIcon';
 import { DownloadIcon } from './components/icons/DownloadIcon';
 import { HistorySidebar } from './components/HistorySidebar';
 import { getHistory, addToHistory, clearHistory, HistoryItem } from './utils/history';
+import { ApiKeyPrompt } from './components/ApiKeyPrompt';
 
 
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
@@ -24,12 +26,10 @@ const App: React.FC = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
-  const [idea, setIdea] = useState('');
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [prompt, setPrompt] = useState('');
   const [selectedStyle, setSelectedStyle] = useState(ART_STYLES[0]);
   
-  const [isGeneratingFromText, setIsGeneratingFromText] = useState(false);
   const [isGeneratingFromImage, setIsGeneratingFromImage] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImageData, setGeneratedImageData] = useState<string | null>(null);
@@ -37,27 +37,29 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
 
+  const apiKey = process.env.API_KEY;
+
   useEffect(() => {
     setHistory(getHistory());
   }, []);
 
-  useEffect(() => {
-    if (!process.env.API_KEY) {
-      setError('An API Key must be set. Please configure the API_KEY environment variable.');
-    }
-  }, []);
-
-  const handleIdeaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setIdea(e.target.value);
-    if (uploadedImage) {
-      setUploadedImage(null);
+  const handleApiCall = async (apiFunction: () => Promise<any>) => {
+    setError(null);
+    try {
+      return await apiFunction();
+    } catch (err: any) {
+      if (err instanceof ApiKeyNotFoundError) {
+        setError("Your API Key is invalid. Please check the 'API_KEY' environment variable in your deployment settings.");
+      } else {
+        setError(err.message || 'An unexpected error occurred.');
+      }
+      throw err; // Re-throw to be caught by the calling function's finally block
     }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setIdea('');
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = (reader.result as string).split(',')[1];
@@ -67,36 +69,18 @@ const App: React.FC = () => {
     }
   };
 
-  const handleCreatePromptFromText = useCallback(async () => {
-    if (!idea.trim()) return;
-    setIsGeneratingFromText(true);
-    setError(null);
-    setPrompt('');
-    try {
-      const generated = await generatePromptFromText(idea);
-      const defaultStyle = ART_STYLES[0];
-      setPrompt(generated + getStyleSuffix(defaultStyle));
-      setSelectedStyle(defaultStyle);
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
-    } finally {
-      setIsGeneratingFromText(false);
-    }
-  }, [idea]);
-
   const handleCreatePromptFromImage = useCallback(async () => {
     if (!uploadedImage) return;
 
     setIsGeneratingFromImage(true);
-    setError(null);
     setPrompt('');
     try {
-      const generated = await generatePromptFromImage(uploadedImage);
+      const generated = await handleApiCall(() => generatePromptFromImage(uploadedImage));
       const defaultStyle = ART_STYLES[0];
       setPrompt(generated + getStyleSuffix(defaultStyle));
       setSelectedStyle(defaultStyle);
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+    } catch (err) {
+      // Error is already handled by handleApiCall
     } finally {
       setIsGeneratingFromImage(false);
     }
@@ -107,18 +91,18 @@ const App: React.FC = () => {
 
     setIsGeneratingImage(true);
     setGeneratedImageData(null);
-    setError(null);
     try {
-      const imageData = await generateImageFromPrompt(prompt);
+      // Pass uploadedImage to retain the original image context for editing.
+      const imageData = await handleApiCall(() => generateImage(prompt, uploadedImage));
       setGeneratedImageData(imageData);
       const newHistory = addToHistory({ prompt, imageData });
       setHistory(newHistory);
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+    } catch (err) {
+        // Error is already handled by handleApiCall
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [prompt]);
+  }, [prompt, uploadedImage]);
 
   const handleStyleChange = (newStyle: string) => {
     const oldSuffix = getStyleSuffix(selectedStyle);
@@ -140,7 +124,6 @@ const App: React.FC = () => {
   
   const handleFullReset = () => {
     setUploadedImage(null);
-    setIdea('');
     handleStartOver();
   }
 
@@ -165,7 +148,6 @@ const App: React.FC = () => {
 
   const handleSelectHistoryItem = (item: HistoryItem) => {
     setUploadedImage(null);
-    setIdea('');
     setPrompt(item.prompt);
     setGeneratedImageData(item.imageData);
     setSelectedStyle(ART_STYLES.find(s => getStyleSuffix(s) && item.prompt.endsWith(getStyleSuffix(s))) || 'None');
@@ -179,7 +161,9 @@ const App: React.FC = () => {
     setIsHistoryOpen(false);
   };
   
-  const isGeneratingPrompt = isGeneratingFromText || isGeneratingFromImage;
+  if (!apiKey) {
+    return <ApiKeyPrompt />;
+  }
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
@@ -199,54 +183,14 @@ const App: React.FC = () => {
         <div className="max-w-3xl mx-auto space-y-8">
           {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
           
-          <div className="space-y-8">
-            <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
-              <h2 className="text-xl font-semibold mb-4 text-center text-slate-300">Start with an Idea</h2>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="text"
-                  value={idea}
-                  onChange={handleIdeaChange}
-                  placeholder="e.g., a cat wearing sunglasses on a beach"
-                  className="flex-grow w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-shadow"
-                  disabled={isGeneratingPrompt}
-                  aria-label="Your idea for a prompt"
-                />
-                <button
-                  onClick={handleCreatePromptFromText}
-                  disabled={isGeneratingPrompt || !idea.trim()}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-6 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-all"
-                >
-                  {isGeneratingFromText ? (
-                    <>
-                      <Spinner small />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <WandIcon className="w-5 h-5" />
-                      Create Prompt
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-            
-            <div className="flex items-center text-center">
-              <div className="flex-grow border-t border-slate-700"></div>
-              <span className="flex-shrink mx-4 text-slate-500 font-semibold text-sm">OR</span>
-              <div className="flex-grow border-t border-slate-700"></div>
-            </div>
-
-            <PromptInput
-              image={uploadedImage}
-              onImageChange={handleImageChange}
-              onCreatePrompt={handleCreatePromptFromImage}
-              isLoading={isGeneratingFromImage}
-              hasPrompt={!!prompt}
-              onImageRemove={handleFullReset}
-            />
-          </div>
+          <PromptInput
+            image={uploadedImage}
+            onImageChange={handleImageChange}
+            onCreatePrompt={handleCreatePromptFromImage}
+            isLoading={isGeneratingFromImage}
+            hasPrompt={!!prompt}
+            onImageRemove={handleFullReset}
+          />
 
           {prompt && (
             <div className="space-y-6 animate-fade-in">
