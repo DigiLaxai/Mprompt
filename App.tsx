@@ -14,6 +14,7 @@ import { CheckIcon } from './components/icons/CheckIcon';
 import { WandIcon } from './components/icons/WandIcon';
 import { GeneratedImageModal } from './components/GeneratedImageModal';
 import { ApiKeySelector } from './components/ApiKeySelector';
+import { XIcon } from './components/icons/XIcon';
 
 type Stage = 'UPLOADING' | 'PROMPTING';
 
@@ -267,11 +268,20 @@ const App: React.FC = () => {
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-semibold mb-4 text-slate-300">1. Your Image</h2>
-                <img 
-                  src={`data:${uploadedImage.mimeType};base64,${uploadedImage.data}`} 
-                  alt="Uploaded content" 
-                  className="rounded-xl shadow-lg border-2 border-slate-700 w-full max-w-sm mx-auto"
-                />
+                <div className="relative w-full max-w-sm mx-auto">
+                  <img 
+                    src={`data:${uploadedImage.mimeType};base64,${uploadedImage.data}`} 
+                    alt="Uploaded content" 
+                    className="rounded-xl shadow-lg border-2 border-slate-700 w-full"
+                  />
+                  <button 
+                    onClick={handleStartOver}
+                    className="absolute -top-3 -right-3 bg-red-600 hover:bg-red-500 text-white rounded-full p-2 shadow-lg transition-transform transform hover:scale-110"
+                    aria-label="Start over"
+                  >
+                    <XIcon className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
@@ -349,12 +359,6 @@ const App: React.FC = () => {
                     )}
                   </button>
                 </div>
-                <button
-                  onClick={handleStartOver}
-                  className="w-full flex items-center justify-center gap-2 bg-slate-700 text-slate-200 font-semibold py-3 px-6 rounded-lg hover:bg-slate-600 transition-colors"
-                >
-                  Start Over
-                </button>
               </div>
             </div>
           )}
