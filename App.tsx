@@ -183,16 +183,18 @@ const App: React.FC = () => {
     const link = document.createElement('a');
     link.href = `data:image/png;base64,${generatedImageData}`;
     
-    // Improved multi-step sanitation for robustness
+    // Final, more robust sanitation logic
     const sanitized = prompt
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '') // Allow letters, numbers, whitespace, hyphens
-      .replace(/\s+/g, '-')          // Replace whitespace with a single hyphen
-      .replace(/-+/g, '-')           // Collapse consecutive hyphens
-      .replace(/^-+|-+$/g, '')       // Remove leading/trailing hyphens
-      .slice(0, 50);
+      .trim()                         // 1. Remove leading/trailing whitespace
+      .toLowerCase()                  // 2. Convert to lowercase
+      .replace(/[^a-z0-9\s]+/g, '')   // 3. Remove all non-alphanumeric/non-whitespace characters
+      .replace(/\s+/g, '-')           // 4. Replace whitespace with hyphens
+      .slice(0, 75)                   // 5. Truncate to a reasonable length
+      .replace(/-+$/, '')             // 6. Remove any trailing hyphens from truncation
+      .replace(/^-+/, '');             // 7. Remove any leading hyphens (edge case)
 
-    const filename = sanitized || 'generated-image';
+    // Fallback if the prompt was only special characters
+    const filename = sanitized || 'promptcraft-generated-image';
     link.download = `${filename}.png`;
     document.body.appendChild(link);
     link.click();
