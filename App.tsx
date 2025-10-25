@@ -3,7 +3,6 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { PromptInput } from './components/PromptInput';
 import { Spinner } from './components/Spinner';
-import { Footer } from './components/Footer';
 import { 
   generatePromptFromImage, 
   generateImage, 
@@ -346,7 +345,6 @@ const App: React.FC = () => {
           )}
         </div>
       </main>
-      <Footer />
     </div>
   );
 };
