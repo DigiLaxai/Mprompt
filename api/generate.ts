@@ -109,9 +109,12 @@ export default async function handler(req: any, res: any) {
                 },
             });
 
-            for (const part of response.candidates[0].content.parts) {
-                if (part.inlineData) {
-                    return res.status(200).json({ result: part.inlineData.data });
+            const firstCandidate = response.candidates?.[0];
+            if (firstCandidate?.content?.parts) {
+                for (const part of firstCandidate.content.parts) {
+                    if (part.inlineData) {
+                        return res.status(200).json({ result: part.inlineData.data });
+                    }
                 }
             }
             
