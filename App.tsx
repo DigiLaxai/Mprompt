@@ -41,6 +41,12 @@ const App: React.FC = () => {
     setHistory(getHistory());
   }, []);
 
+  useEffect(() => {
+    if (!process.env.API_KEY) {
+      setError('An API Key must be set. Please configure the API_KEY environment variable.');
+    }
+  }, []);
+
   const handleIdeaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setIdea(e.target.value);
     if (uploadedImage) {
