@@ -1,14 +1,14 @@
 
 import React from 'react';
-import { SettingsIcon } from './icons/SettingsIcon';
 import { HistoryIcon } from './icons/HistoryIcon';
+import { SettingsIcon } from './icons/SettingsIcon';
 
 interface HeaderProps {
-    onSettingsClick: () => void;
     onHistoryClick: () => void;
+    onSettingsClick: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onSettingsClick, onHistoryClick }) => {
+export const Header: React.FC<HeaderProps> = ({ onHistoryClick, onSettingsClick }) => {
   return (
     <header className="bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10 border-b border-slate-800">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">

@@ -1,3 +1,4 @@
+
 import React, { useRef } from 'react';
 import { ImageIcon } from './icons/ImageIcon';
 import { XIcon } from './icons/XIcon';
@@ -7,7 +8,7 @@ interface PromptInputProps {
   image: { data: string; mimeType: string; } | null;
   onImageChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onCreatePrompt: () => void;
-  isLoading: boolean;
+  isAnalyzingImage: boolean;
   hasPrompt: boolean;
   onImageRemove: () => void;
 }
@@ -16,41 +17,49 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   image, 
   onImageChange, 
   onCreatePrompt, 
-  isLoading,
+  isAnalyzingImage,
   hasPrompt,
-  onImageRemove
+  onImageRemove,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageUploadClick = () => {
+    if (isAnalyzingImage) return;
     fileInputRef.current?.click();
   };
   
+  if (hasPrompt) {
+    return null;
+  }
+
   return (
     <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
-      <h2 className="text-xl font-semibold mb-4 text-center text-slate-300">Start with an Image</h2>
       
       {!image ? (
-        <div 
-          onClick={handleImageUploadClick}
-          className="relative block w-full border-2 border-dashed border-slate-600 rounded-lg p-12 text-center hover:border-yellow-500 cursor-pointer transition-colors"
-        >
-          <ImageIcon className="mx-auto h-12 w-12 text-slate-500" />
-          <span className="mt-2 block text-sm font-semibold text-slate-400">
-            Click to upload an image
-          </span>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={onImageChange}
-            accept="image/png, image/jpeg, image/webp"
-            className="hidden"
-            onClick={(e) => (e.currentTarget.value = '')}
-            disabled={isLoading}
-          />
-        </div>
+        <>
+          <h2 className="text-xl font-semibold mb-4 text-center text-slate-300">Start Your Creation</h2>
+          <div 
+            onClick={handleImageUploadClick}
+            className={`relative block w-full border-2 border-dashed border-slate-600 rounded-lg p-12 text-center transition-colors ${isAnalyzingImage ? 'cursor-not-allowed opacity-50' : 'hover:border-yellow-500 cursor-pointer'}`}
+          >
+            <ImageIcon className="mx-auto h-12 w-12 text-slate-500" />
+            <span className="mt-2 block text-sm font-semibold text-slate-400">
+              Upload an Image
+            </span>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={onImageChange}
+              accept="image/png, image/jpeg, image/webp"
+              className="hidden"
+              onClick={(e) => (e.currentTarget.value = '')}
+              disabled={isAnalyzingImage}
+            />
+          </div>
+        </>
       ) : (
         <div className="space-y-4">
+          <h2 className="text-xl font-semibold mb-4 text-center text-slate-300">Create from Image</h2>
           <div className="relative w-full sm:w-48 mx-auto">
             <img 
               src={`data:${image.mimeType};base64,${image.data}`} 
@@ -68,10 +77,10 @@ export const PromptInput: React.FC<PromptInputProps> = ({
           {!hasPrompt && (
             <button
               onClick={onCreatePrompt}
-              disabled={isLoading}
+              disabled={isAnalyzingImage}
               className="w-full flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-all duration-300"
             >
-              {isLoading ? (
+              {isAnalyzingImage ? (
                 <>
                   <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
