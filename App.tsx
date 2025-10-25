@@ -173,35 +173,40 @@ const App: React.FC = () => {
   }, [editablePrompt]);
 
   const handleGenerateImage = useCallback(async () => {
-      if (!editablePrompt.trim() || !apiKey) return;
+    if (!editablePrompt.trim() || !apiKey) return;
 
-      setIsGeneratingImage(true);
-      setError(null);
-      try {
-        const image = await generateImageFromPrompt(editablePrompt, apiKey);
-        setGeneratedImage(image);
-        setIsModalOpen(true);
+    if (!uploadedImage) {
+      setError('An uploaded image is required to generate a new image.');
+      return;
+    }
 
-        // Update history with the generated image
-        const latestHistoryItem = history[0];
-        if (latestHistoryItem && latestHistoryItem.basePrompt + getStyleSuffix(latestHistoryItem.selectedStyle) === editablePrompt) {
-          const updatedItem = { ...latestHistoryItem, generatedImage: image };
-          const updatedHistory = [updatedItem, ...history.slice(1)];
-          setHistory(updatedHistory);
-          saveHistory(updatedHistory);
-        }
-      } catch (err: any) {
-        if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
-          setError('Your API key is invalid. Please enter a new one.');
-          localStorage.removeItem(API_KEY_STORAGE_KEY);
-          setApiKey(null);
-        } else {
-          setError(err.message || 'Failed to generate image.');
-        }
-      } finally {
-        setIsGeneratingImage(false);
+    setIsGeneratingImage(true);
+    setError(null);
+    try {
+      const image = await generateImageFromPrompt(editablePrompt, uploadedImage, apiKey);
+      setGeneratedImage(image);
+      setIsModalOpen(true);
+
+      // Update history with the generated image
+      const latestHistoryItem = history[0];
+      if (latestHistoryItem && latestHistoryItem.basePrompt + getStyleSuffix(latestHistoryItem.selectedStyle) === editablePrompt) {
+        const updatedItem = { ...latestHistoryItem, generatedImage: image };
+        const updatedHistory = [updatedItem, ...history.slice(1)];
+        setHistory(updatedHistory);
+        saveHistory(updatedHistory);
       }
-  }, [editablePrompt, history, selectedStyle, apiKey]);
+    } catch (err: any) {
+      if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
+        setError('Your API key is invalid. Please enter a new one.');
+        localStorage.removeItem(API_KEY_STORAGE_KEY);
+        setApiKey(null);
+      } else {
+        setError(err.message || 'Failed to generate image.');
+      }
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  }, [editablePrompt, history, selectedStyle, apiKey, uploadedImage]);
 
 
   const handleClearError = () => setError(null);

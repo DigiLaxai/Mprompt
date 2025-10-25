@@ -4,7 +4,7 @@ const getAIClient = (apiKey: string) => {
     return new GoogleGenAI({ apiKey });
 };
 
-const imagePromptingSystemInstruction = `You are an expert at analyzing images and creating descriptive prompts for AI image generation. Describe the provided image in vivid detail. Cover the main subject, the background/setting, the artistic style (e.g., photorealistic, illustration, painting), the lighting, the color palette, composition, and overall mood. The description must be a single, coherent paragraph suitable for use as a prompt for a text-to-image AI model. Do not add any preamble or explanation.`;
+const imagePromptingSystemInstruction = `You are an expert at analyzing images to create descriptive, editable prompts for AI image generation. Your goal is to create a prompt that allows a user to easily change the setting while keeping the main subject consistent. Describe the main subject (person or character) in detail first, then describe the background/setting. The description should be a single, coherent paragraph. For example: "A photorealistic portrait of a woman with curly red hair, smiling, wearing a black leather jacket, standing on a busy street in New York City at dusk." Do not add any preamble or explanation.`;
 
 interface Image {
     data: string;
@@ -36,13 +36,25 @@ export const generatePromptFromImage = async (image: Image, apiKey: string): Pro
     return response.text.trim();
 }
 
-export const generateImageFromPrompt = async (prompt: string, apiKey: string): Promise<{ data: string; mimeType: string; }> => {
+export const generateImageFromPrompt = async (prompt: string, originalImage: Image, apiKey: string): Promise<{ data: string; mimeType: string; }> => {
     if (!apiKey) throw new Error("API Key is not configured.");
     const ai = getAIClient(apiKey);
+
+    // Add a prefix to guide the model for better character consistency.
+    const finalPrompt = `Using the person from the provided reference image as the main subject, create a new image based on this description: "${prompt}"`;
+
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: {
-            parts: [{ text: prompt }],
+            parts: [
+                {
+                    inlineData: {
+                        data: originalImage.data,
+                        mimeType: originalImage.mimeType,
+                    },
+                },
+                { text: finalPrompt }
+            ],
         },
         config: {
             responseModalities: [Modality.IMAGE],
