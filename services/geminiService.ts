@@ -144,3 +144,39 @@ export const generateImage = async (apiKey: string, prompt: string, image: { dat
         throw new Error(message);
     }
 };
+
+const inspirationSystemInstruction = `You are a creative assistant that generates inspiring and visually rich prompts for AI image generation models.
+The user will ask for a prompt. Provide a single, concise, yet highly descriptive prompt. Do not add any conversational text or markdown formatting. Just return the prompt text.
+Example: "An astronaut riding a majestic, bioluminescent jellyfish through the swirling nebulae of a distant galaxy, digital art."
+`;
+
+export const generateInspirationPrompt = async (apiKey: string): Promise<string> => {
+    try {
+        const ai = new GoogleGenAI({ apiKey });
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: "Generate a random, creative image prompt.",
+            config: {
+                systemInstruction: inspirationSystemInstruction,
+                temperature: 0.9,
+            },
+        });
+        
+        const candidate = validateApiResponse(response);
+        const text = candidate.content.parts[0]?.text;
+
+        if (!text) {
+            throw new Error('The AI model returned an empty text response.');
+        }
+
+        return text.trim();
+
+    } catch (error: any) {
+        console.error("Gemini API Error (generateInspirationPrompt):", error);
+        const message = error.message?.includes('API key not valid') 
+            ? 'Your API key is not valid. Please check it and try again.'
+            : error.message || 'An unexpected error occurred while generating an inspiration prompt.';
+        throw new Error(message);
+    }
+}

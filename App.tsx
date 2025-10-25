@@ -6,6 +6,7 @@ import { Spinner } from './components/Spinner';
 import { 
   generatePromptFromImage, 
   generateImage, 
+  generateInspirationPrompt,
   StructuredPrompt as FullStructuredPrompt,
 } from './services/geminiService';
 import { ErrorBanner } from './components/ErrorBanner';
@@ -16,6 +17,7 @@ import { DownloadIcon } from './components/icons/DownloadIcon';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { HistorySidebar } from './components/HistorySidebar';
 import { getHistory, addToHistory, clearHistory, HistoryItem } from './utils/history';
+import { Footer } from './components/Footer';
 
 const API_KEY_STORAGE_KEY = 'gemini-api-key';
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
@@ -76,6 +78,7 @@ const App: React.FC = () => {
   
   const [isGeneratingFromImage, setIsGeneratingFromImage] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isGeneratingInspiration, setIsGeneratingInspiration] = useState(false);
   const [generatedImageData, setGeneratedImageData] = useState<string | null>(null);
   
   const [error, setError] = useState<string | null>(null);
@@ -140,6 +143,28 @@ const App: React.FC = () => {
       setIsGeneratingFromImage(false);
     }
   }, [apiKey, uploadedImage]);
+
+  const handleGetRandomPrompt = useCallback(async () => {
+    if (!ensureApiKey()) return;
+
+    setIsGeneratingInspiration(true);
+    setError(null);
+    setUploadedImage(null);
+    setStructuredPrompt(null);
+    setGeneratedImageData(null);
+    setSelectedStyle(ART_STYLES[0]);
+    setPrompt('');
+
+    try {
+      const newPrompt = await generateInspirationPrompt(apiKey!);
+      setPrompt(newPrompt);
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred.');
+      setPrompt('');
+    } finally {
+      setIsGeneratingInspiration(false);
+    }
+  }, [apiKey]);
 
   const handleGenerateImage = useCallback(async () => {
     if (!prompt.trim() || !ensureApiKey()) return;
@@ -345,6 +370,7 @@ const App: React.FC = () => {
           )}
         </div>
       </main>
+      <Footer onGetRandomPrompt={handleGetRandomPrompt} isLoading={isGeneratingInspiration} />
     </div>
   );
 };
