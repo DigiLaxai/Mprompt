@@ -12,7 +12,7 @@ export const Header: React.FC<HeaderProps> = ({ onHistoryClick }) => {
         <div className="flex justify-between items-center py-4">
           <h1 className="text-2xl font-bold tracking-tighter">
             <span className="text-yellow-400">Prompt</span>
-            <span className="text-slate-300">Craft</span>
+            <span className="text-slate-300">Craft Studio</span>
           </h1>
           <button
             onClick={onHistoryClick}
