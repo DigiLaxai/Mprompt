@@ -1,12 +1,13 @@
 
 import React from 'react';
 import { HistoryIcon } from './icons/HistoryIcon';
-import { SettingsIcon } from './icons/SettingsIcon';
 
+// FIX: Removed onSettingsClick prop as API key is now handled by environment variables.
 interface HeaderProps {
     onHistoryClick: () => void;
 }
 
+// FIX: Removed onSettingsClick prop.
 export const Header: React.FC<HeaderProps> = ({ onHistoryClick }) => {
   return (
     <header className="bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10 border-b border-slate-800">

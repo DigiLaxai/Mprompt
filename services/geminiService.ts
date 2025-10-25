@@ -92,10 +92,10 @@ function validateResponse(response: GenerateContentResponse) {
     }
 }
 
-export const generatePromptFromImage = async (apiKey: string, image: { data: string; mimeType: string; }): Promise<StructuredPrompt> => {
+// FIX: Refactored to use `process.env.API_KEY` as per the guidelines. Removed `apiKey` parameter.
+export const generatePromptFromImage = async (image: { data: string; mimeType: string; }): Promise<StructuredPrompt> => {
     try {
-        if (!apiKey) throw new Error("An API Key must be set when running in a browser");
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const contents = {
             parts: [{
                 inlineData: { data: image.data, mimeType: image.mimeType },
@@ -134,10 +134,10 @@ export const generatePromptFromImage = async (apiKey: string, image: { data: str
     }
 };
 
-export const generateInspirationFromImage = async (apiKey: string, image: { data: string; mimeType: string; }): Promise<string[]> => {
+// FIX: Refactored to use `process.env.API_KEY` as per the guidelines. Removed `apiKey` parameter.
+export const generateInspirationFromImage = async (image: { data: string; mimeType: string; }): Promise<string[]> => {
     try {
-        if (!apiKey) throw new Error("An API Key must be set when running in a browser");
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const contents = {
             parts: [{
                 inlineData: { data: image.data, mimeType: image.mimeType },
@@ -180,10 +180,10 @@ export const generateInspirationFromImage = async (apiKey: string, image: { data
     }
 };
 
-export const generateImage = async (apiKey: string, prompt: string, image: { data: string; mimeType: string; } | null): Promise<string> => {
+// FIX: Refactored to use `process.env.API_KEY` as per the guidelines. Removed `apiKey` parameter.
+export const generateImage = async (prompt: string, image: { data: string; mimeType: string; } | null): Promise<string> => {
     try {
-        if (!apiKey) throw new Error("An API Key must be set when running in a browser");
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const parts: any[] = [];
         let finalPrompt = prompt;
 

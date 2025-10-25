@@ -16,8 +16,6 @@ import { WandIcon } from './components/icons/WandIcon';
 import { HistorySidebar } from './components/HistorySidebar';
 import { getHistory, addToHistory, clearHistory, HistoryItem } from './utils/history';
 import { InspirationList } from './components/InspirationList';
-import { ApiKeyModal } from './components/ApiKeyModal';
-import { KeyIcon } from './components/icons/KeyIcon';
 import { GeneratedImageView } from './components/GeneratedImageView';
 import { ImageSkeletonLoader } from './components/ImageSkeletonLoader';
 
@@ -73,8 +71,7 @@ const PromptField: React.FC<{
 
 
 const App: React.FC = () => {
-  const [apiKey, setApiKey] = useState('');
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  // FIX: Removed API Key management state. API key is now handled via environment variables.
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
@@ -94,19 +91,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     setHistory(getHistory());
-    const storedKey = localStorage.getItem('gemini-api-key');
-    if (storedKey) {
-        setApiKey(storedKey);
-    } else {
-        setIsApiKeyModalOpen(true);
-    }
+    // FIX: Removed API Key logic from useEffect.
   }, []);
   
-  const handleSaveApiKey = (key: string) => {
-    setApiKey(key);
-    localStorage.setItem('gemini-api-key', key);
-    setError(null);
-  };
+  // FIX: Removed handleSaveApiKey function.
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -129,9 +117,9 @@ const App: React.FC = () => {
     }
   };
 
+  // FIX: Removed apiKey dependency and argument to service call.
   const handleCreatePromptFromImage = useCallback(async () => {
-    if (!uploadedImage || !apiKey) {
-      if (!apiKey) setError({ message: "Please set your API key in the settings." });
+    if (!uploadedImage) {
       return;
     }
 
@@ -141,7 +129,7 @@ const App: React.FC = () => {
     setInspirationPrompts(null);
     setError(null);
     try {
-      const generated = await generatePromptFromImage(apiKey, uploadedImage);
+      const generated = await generatePromptFromImage(uploadedImage);
       const { style, ...rest } = generated;
       const newStyle = style && ART_STYLES.includes(style) ? style : ART_STYLES[0];
       
@@ -156,11 +144,11 @@ const App: React.FC = () => {
     } finally {
       setIsGeneratingFromImage(false);
     }
-  }, [uploadedImage, apiKey]);
+  }, [uploadedImage]);
   
+  // FIX: Removed apiKey dependency and argument to service call.
   const handleGetInspiration = useCallback(async () => {
-    if (!uploadedImage || !apiKey) {
-      if (!apiKey) setError({ message: "Please set your API key in the settings." });
+    if (!uploadedImage) {
       return;
     }
   
@@ -170,7 +158,7 @@ const App: React.FC = () => {
     setInspirationPrompts(null);
     setError(null);
     try {
-      const prompts = await generateInspirationFromImage(apiKey, uploadedImage);
+      const prompts = await generateInspirationFromImage(uploadedImage);
       setInspirationPrompts(prompts);
     } catch (err: any) {
       setError({
@@ -180,7 +168,7 @@ const App: React.FC = () => {
     } finally {
       setIsGeneratingInspiration(false);
     }
-  }, [uploadedImage, apiKey]);
+  }, [uploadedImage]);
 
   const handleSelectInspiration = (selectedPrompt: string) => {
     setPrompt(selectedPrompt);
@@ -188,9 +176,9 @@ const App: React.FC = () => {
     setStructuredPrompt(null); // Switch to manual mode
   };
 
+  // FIX: Removed apiKey dependency and argument to service call.
   const handleGenerateImage = useCallback(async () => {
-    if (!prompt.trim() || !apiKey) {
-      if (!apiKey) setError({ message: "Please set your API key in the settings." });
+    if (!prompt.trim()) {
       return;
     }
 
@@ -198,7 +186,7 @@ const App: React.FC = () => {
     setGeneratedImageData(null);
     setError(null);
     try {
-      const imageData = await generateImage(apiKey, prompt, uploadedImage);
+      const imageData = await generateImage(prompt, uploadedImage);
       setGeneratedImageData(imageData);
       const newHistory = addToHistory({ prompt, imageData });
       setHistory(newHistory);
@@ -210,7 +198,7 @@ const App: React.FC = () => {
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [prompt, uploadedImage, apiKey]);
+  }, [prompt, uploadedImage]);
 
   const handleStructuredPromptChange = (field: keyof StructuredPrompt, value: string) => {
     if (!structuredPrompt) return;
@@ -280,13 +268,9 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
-      <Header onHistoryClick={() => setIsHistoryOpen(true)} onSettingsClick={() => setIsApiKeyModalOpen(true)} />
-      <ApiKeyModal 
-        isOpen={isApiKeyModalOpen}
-        onClose={() => setIsApiKeyModalOpen(false)}
-        onSave={handleSaveApiKey}
-        currentApiKey={apiKey}
-      />
+      {/* FIX: Removed settings functionality from Header */}
+      <Header onHistoryClick={() => setIsHistoryOpen(true)} />
+      {/* FIX: Removed ApiKeyModal */}
       <HistorySidebar
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
@@ -297,20 +281,7 @@ const App: React.FC = () => {
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         <div className="max-w-3xl mx-auto">
-          {!apiKey && !isApiKeyModalOpen && (
-              <div className="bg-yellow-900/50 border border-yellow-700 text-yellow-300 px-4 py-3 rounded-lg flex items-center justify-between gap-4 mb-6">
-                <div className="flex items-center gap-3">
-                  <KeyIcon className="w-6 h-6 flex-shrink-0" />
-                  <p className="text-sm font-medium">Your Gemini API Key is not set.</p>
-                </div>
-                <button
-                  onClick={() => setIsApiKeyModalOpen(true)}
-                  className="bg-yellow-500 text-slate-900 font-bold py-1 px-3 rounded-md hover:bg-yellow-400 transition-colors text-sm"
-                >
-                  Set Key
-                </button>
-              </div>
-          )}
+          {/* FIX: Removed API Key banner */}
 
           <div className="space-y-8">
             {error && (

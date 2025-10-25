@@ -71,6 +71,7 @@ const PromptField: React.FC<{
 
 
 const App: React.FC = () => {
+  // FIX: Removed API Key management state. API key is now handled via environment variables.
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
@@ -90,8 +91,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     setHistory(getHistory());
+    // FIX: Removed API Key logic from useEffect.
   }, []);
   
+  // FIX: Removed handleSaveApiKey function.
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     const file = e.target.files?.[0];
@@ -113,6 +117,7 @@ const App: React.FC = () => {
     }
   };
 
+  // FIX: Removed apiKey dependency and argument to service call.
   const handleCreatePromptFromImage = useCallback(async () => {
     if (!uploadedImage) {
       return;
@@ -141,6 +146,7 @@ const App: React.FC = () => {
     }
   }, [uploadedImage]);
   
+  // FIX: Removed apiKey dependency and argument to service call.
   const handleGetInspiration = useCallback(async () => {
     if (!uploadedImage) {
       return;
@@ -170,6 +176,7 @@ const App: React.FC = () => {
     setStructuredPrompt(null); // Switch to manual mode
   };
 
+  // FIX: Removed apiKey dependency and argument to service call.
   const handleGenerateImage = useCallback(async () => {
     if (!prompt.trim()) {
       return;
@@ -261,7 +268,9 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
+      {/* FIX: Removed settings functionality from Header */}
       <Header onHistoryClick={() => setIsHistoryOpen(true)} />
+      {/* FIX: Removed ApiKeyModal */}
       <HistorySidebar
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
@@ -272,7 +281,8 @@ const App: React.FC = () => {
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         <div className="max-w-3xl mx-auto">
-          
+          {/* FIX: Removed API Key banner */}
+
           <div className="space-y-8">
             {error && (
               <ErrorBanner 

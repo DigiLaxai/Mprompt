@@ -45,7 +45,9 @@ const processApiError = (error: any): Error => {
   let message = 'An unexpected error occurred. Please try again.';
   if (error instanceof Error) {
     const lowerCaseMessage = error.message.toLowerCase();
-    if (lowerCaseMessage.includes('quota')) {
+    if (lowerCaseMessage.includes('api key not valid') || lowerCaseMessage.includes('permission denied')) {
+      message = 'Your API key is invalid or lacks permissions. Please check your key in the settings and try again.';
+    } else if (lowerCaseMessage.includes('quota')) {
       message = 'You have exceeded your API quota. Please check your Google AI Studio account for details.';
     } else if (lowerCaseMessage.includes('network') || lowerCaseMessage.includes('failed to fetch')) {
       message = 'A network error occurred. Please check your internet connection and try again.';
@@ -75,7 +77,7 @@ function validateResponse(response: GenerateContentResponse) {
             case 'MAX_TOKENS':
                 errorMessage = `The response was cut off because it reached the maximum length. Try a more concise prompt.`;
                 break;
-            // Fix: 'PROMPT_BLOCKED' is not a valid finishReason. This case has been removed.
+            // FIX: Removed invalid 'PROMPT_BLOCKED' case. The 'SAFETY' case handles content blocking.
             default:
                 errorMessage = `The generation failed due to an unhandled reason: ${candidate.finishReason}.`;
                 break;
@@ -88,10 +90,10 @@ function validateResponse(response: GenerateContentResponse) {
     }
 }
 
+// FIX: Refactored to use `process.env.API_KEY` as per the guidelines. Removed `apiKey` parameter.
 export const generatePromptFromImage = async (image: { data: string; mimeType: string; }): Promise<StructuredPrompt> => {
     try {
-        // Fix: Use process.env.API_KEY and remove apiKey parameter, per guidelines.
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const contents = {
             parts: [{
                 inlineData: { data: image.data, mimeType: image.mimeType },
@@ -130,10 +132,10 @@ export const generatePromptFromImage = async (image: { data: string; mimeType: s
     }
 };
 
+// FIX: Refactored to use `process.env.API_KEY` as per the guidelines. Removed `apiKey` parameter.
 export const generateInspirationFromImage = async (image: { data: string; mimeType: string; }): Promise<string[]> => {
     try {
-        // Fix: Use process.env.API_KEY and remove apiKey parameter, per guidelines.
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const contents = {
             parts: [{
                 inlineData: { data: image.data, mimeType: image.mimeType },
@@ -176,10 +178,10 @@ export const generateInspirationFromImage = async (image: { data: string; mimeTy
     }
 };
 
+// FIX: Refactored to use `process.env.API_KEY` as per the guidelines. Removed `apiKey` parameter.
 export const generateImage = async (prompt: string, image: { data: string; mimeType: string; } | null): Promise<string> => {
     try {
-        // Fix: Use process.env.API_KEY and remove apiKey parameter, per guidelines.
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const parts: any[] = [];
         let finalPrompt = prompt;
 
