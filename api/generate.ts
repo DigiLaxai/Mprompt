@@ -103,7 +103,7 @@ export default async function handler(req: any, res: any) {
                 return res.status(200).json({ result: JSON.parse(text) });
             } catch (e) {
                 console.error("Failed to parse JSON response from AI:", text);
-                throw new Error("The AI returned a response that was not in the expected format.");
+                throw new Error(`The AI returned a response that was not in the expected format. The model said: "${text}"`);
             }
 
         } else if (action === 'generateImage') {
