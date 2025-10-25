@@ -24,6 +24,11 @@ const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', '
 
 type StructuredPrompt = Omit<FullStructuredPrompt, 'style'>;
 
+interface AppError {
+  message: string;
+  onRetry?: () => void;
+}
+
 const getStyleSuffix = (style: string): string => {
   if (!style || style === 'None') return '';
   return `, in the style of ${style.toLowerCase()}`;
@@ -82,7 +87,7 @@ const App: React.FC = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImageData, setGeneratedImageData] = useState<string | null>(null);
   
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AppError | null>(null);
   const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
@@ -119,7 +124,7 @@ const App: React.FC = () => {
 
   const handleCreatePromptFromImage = useCallback(async () => {
     if (!uploadedImage || !apiKey) {
-      if (!apiKey) setError("Please set your API key in the settings.");
+      if (!apiKey) setError({ message: "Please set your API key in the settings." });
       return;
     }
 
@@ -137,7 +142,10 @@ const App: React.FC = () => {
       setSelectedStyle(newStyle);
       setPrompt(constructPromptFromObject(rest, newStyle));
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      setError({ 
+        message: err.message || 'An unexpected error occurred.',
+        onRetry: handleCreatePromptFromImage,
+      });
     } finally {
       setIsGeneratingFromImage(false);
     }
@@ -145,7 +153,7 @@ const App: React.FC = () => {
   
   const handleGetInspiration = useCallback(async () => {
     if (!uploadedImage || !apiKey) {
-      if (!apiKey) setError("Please set your API key in the settings.");
+      if (!apiKey) setError({ message: "Please set your API key in the settings." });
       return;
     }
   
@@ -158,7 +166,10 @@ const App: React.FC = () => {
       const prompts = await generateInspirationFromImage(apiKey, uploadedImage);
       setInspirationPrompts(prompts);
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred while getting inspiration.');
+      setError({
+        message: err.message || 'An unexpected error occurred while getting inspiration.',
+        onRetry: handleGetInspiration,
+      });
     } finally {
       setIsGeneratingInspiration(false);
     }
@@ -172,7 +183,7 @@ const App: React.FC = () => {
 
   const handleGenerateImage = useCallback(async () => {
     if (!prompt.trim() || !apiKey) {
-      if (!apiKey) setError("Please set your API key in the settings.");
+      if (!apiKey) setError({ message: "Please set your API key in the settings." });
       return;
     }
 
@@ -185,7 +196,10 @@ const App: React.FC = () => {
       const newHistory = addToHistory({ prompt, imageData });
       setHistory(newHistory);
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      setError({ 
+        message: err.message || 'An unexpected error occurred.',
+        onRetry: handleGenerateImage,
+       });
     } finally {
       setIsGeneratingImage(false);
     }
@@ -294,7 +308,13 @@ const App: React.FC = () => {
           )}
 
           <div className="space-y-8">
-            {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+            {error && (
+              <ErrorBanner 
+                message={error.message} 
+                onDismiss={() => setError(null)} 
+                onRetry={error.onRetry}
+              />
+            )}
             
             <PromptInput 
               image={uploadedImage} 

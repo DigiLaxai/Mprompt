@@ -41,6 +41,23 @@ const inspirationSchema = {
     required: ['prompts'],
 };
 
+const processApiError = (error: any): Error => {
+  let message = 'An unexpected error occurred. Please try again.';
+  if (error instanceof Error) {
+    const lowerCaseMessage = error.message.toLowerCase();
+    if (lowerCaseMessage.includes('api key not valid') || lowerCaseMessage.includes('permission denied')) {
+      message = 'Your API key is invalid or lacks permissions. Please check your key in the settings and try again.';
+    } else if (lowerCaseMessage.includes('quota')) {
+      message = 'You have exceeded your API quota. Please check your Google AI Studio account for details.';
+    } else if (lowerCaseMessage.includes('network') || lowerCaseMessage.includes('failed to fetch')) {
+      message = 'A network error occurred. Please check your internet connection and try again.';
+    } else {
+      message = error.message;
+    }
+  }
+  return new Error(message);
+};
+
 function validateResponse(response: GenerateContentResponse) {
     if (!response.candidates?.length) {
         throw new Error('The AI model did not provide a valid response.');
@@ -99,7 +116,7 @@ export const generatePromptFromImage = async (apiKey: string, image: { data: str
         }
     } catch (error: any) {
         console.error("Gemini API Error (generatePromptFromImage):", error);
-        throw new Error(error.message || 'An unexpected error occurred while generating the prompt.');
+        throw processApiError(error);
     }
 };
 
@@ -145,7 +162,7 @@ export const generateInspirationFromImage = async (apiKey: string, image: { data
         }
     } catch (error: any) {
         console.error("Gemini API Error (generateInspirationFromImage):", error);
-        throw new Error(error.message || 'An unexpected error occurred while generating inspiration.');
+        throw processApiError(error);
     }
 };
 
@@ -191,6 +208,6 @@ export const generateImage = async (apiKey: string, prompt: string, image: { dat
         throw new Error('No image data was found in the API response. The response may have been blocked or empty.');
     } catch (error: any) {
         console.error("Gemini API Error (generateImage):", error);
-        throw new Error(error.message || 'An unexpected error occurred while generating the image.');
+        throw processApiError(error);
     }
 };
