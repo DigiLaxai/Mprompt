@@ -13,6 +13,8 @@ export interface StructuredPrompt {
 
 const imagePromptingSystemInstruction = `You are an expert at analyzing images and creating descriptive prompts for AI image generation. Analyze the provided image and describe it in vivid detail by filling out the JSON schema. Be descriptive and creative.`;
 
+const inspirationSystemInstruction = `You are a creative assistant for an AI artist. Your task is to look at an image and generate three distinct, creative, and inspiring prompts for a text-to-image model. Each prompt should offer a unique artistic direction, re-imagining the image's subject in a different style, context, or mood. The prompts should be concise but evocative. Return the three prompts as a JSON object with a key 'prompts' containing an array of strings.`;
+
 const promptSchema = {
     type: Type.OBJECT,
     properties: {
@@ -25,6 +27,18 @@ const promptSchema = {
         mood: { type: Type.STRING, description: 'The overall mood or feeling of the image, such as "peaceful and serene" or "chaotic and energetic".' },
     },
     required: ['subject', 'setting', 'style', 'lighting', 'colors', 'composition', 'mood'],
+};
+
+const inspirationSchema = {
+    type: Type.OBJECT,
+    properties: {
+        prompts: {
+            type: Type.ARRAY,
+            description: "An array of three distinct, creative prompts.",
+            items: { type: Type.STRING },
+        },
+    },
+    required: ['prompts'],
 };
 
 function validateResponse(response: GenerateContentResponse) {
@@ -96,6 +110,54 @@ export const generatePromptFromImage = async (apiKey: string, image: { data: str
             throw new Error('Your API key is not valid. Please check it in the settings.');
         }
         throw new Error(error.message || 'An unexpected error occurred while generating the prompt.');
+    }
+};
+
+export const generateInspirationFromImage = async (apiKey: string, image: { data: string; mimeType: string; }): Promise<string[]> => {
+    try {
+        const ai = getAiClient(apiKey);
+        const contents = {
+            parts: [{
+                inlineData: { data: image.data, mimeType: image.mimeType },
+            }, { 
+                text: "Give me three creative prompts based on this image." 
+            }]
+        };
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents,
+            config: {
+                systemInstruction: inspirationSystemInstruction,
+                temperature: 0.8,
+                responseMimeType: "application/json",
+                responseSchema: inspirationSchema,
+            },
+        });
+        
+        validateResponse(response);
+        const text = response.text;
+
+        if (!text) {
+            throw new Error('The AI model returned an empty text response.');
+        }
+        
+        try {
+            const result = JSON.parse(text);
+            if (Array.isArray(result.prompts) && result.prompts.length > 0) {
+                return result.prompts;
+            }
+            throw new Error("The AI returned an invalid format for inspiration prompts.");
+        } catch (e) {
+            console.error("Failed to parse JSON response from AI:", text);
+            throw new Error(`The AI returned a response that was not in the expected format.`);
+        }
+    } catch (error: any) {
+        console.error("Gemini API Error (generateInspirationFromImage):", error);
+        if (error.message.includes('API key not valid')) {
+            throw new Error('Your API key is not valid. Please check it in the settings.');
+        }
+        throw new Error(error.message || 'An unexpected error occurred while generating inspiration.');
     }
 };
 

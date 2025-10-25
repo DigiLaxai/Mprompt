@@ -5,6 +5,7 @@ import { PromptInput } from './components/PromptInput';
 import { Spinner } from './components/Spinner';
 import { 
   generatePromptFromImage, 
+  generateInspirationFromImage,
   generateImage, 
   StructuredPrompt as FullStructuredPrompt,
 } from './services/geminiService';
@@ -17,6 +18,7 @@ import { HistorySidebar } from './components/HistorySidebar';
 import { getHistory, addToHistory, clearHistory, HistoryItem } from './utils/history';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { KeyIcon } from './components/icons/KeyIcon';
+import { InspirationList } from './components/InspirationList';
 
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
 
@@ -72,9 +74,11 @@ const App: React.FC = () => {
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [prompt, setPrompt] = useState('');
   const [structuredPrompt, setStructuredPrompt] = useState<StructuredPrompt | null>(null);
+  const [inspirationPrompts, setInspirationPrompts] = useState<string[] | null>(null);
   const [selectedStyle, setSelectedStyle] = useState(ART_STYLES[0]);
   
   const [isGeneratingFromImage, setIsGeneratingFromImage] = useState(false);
+  const [isGeneratingInspiration, setIsGeneratingInspiration] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImageData, setGeneratedImageData] = useState<string | null>(null);
   
@@ -109,6 +113,7 @@ const App: React.FC = () => {
         setUploadedImage({ data: base64String, mimeType: file.type });
         setPrompt('');
         setStructuredPrompt(null);
+        setInspirationPrompts(null);
         setGeneratedImageData(null);
       };
       reader.readAsDataURL(file);
@@ -126,6 +131,7 @@ const App: React.FC = () => {
     setIsGeneratingFromImage(true);
     setPrompt('');
     setStructuredPrompt(null);
+    setInspirationPrompts(null);
     setError(null);
     try {
       const generated = await generatePromptFromImage(apiKey, uploadedImage);
@@ -141,6 +147,35 @@ const App: React.FC = () => {
       setIsGeneratingFromImage(false);
     }
   }, [uploadedImage, apiKey]);
+  
+  const handleGetInspiration = useCallback(async () => {
+    if (!uploadedImage) return;
+    if (!apiKey) {
+      setError("Please set your Gemini API key in the settings.");
+      setIsSettingsOpen(true);
+      return;
+    }
+  
+    setIsGeneratingInspiration(true);
+    setPrompt('');
+    setStructuredPrompt(null);
+    setInspirationPrompts(null);
+    setError(null);
+    try {
+      const prompts = await generateInspirationFromImage(apiKey, uploadedImage);
+      setInspirationPrompts(prompts);
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred while getting inspiration.');
+    } finally {
+      setIsGeneratingInspiration(false);
+    }
+  }, [uploadedImage, apiKey]);
+
+  const handleSelectInspiration = (selectedPrompt: string) => {
+    setPrompt(selectedPrompt);
+    setInspirationPrompts(null);
+    setStructuredPrompt(null); // Switch to manual mode
+  };
 
   const handleGenerateImage = useCallback(async () => {
     if (!prompt.trim()) return;
@@ -191,6 +226,7 @@ const App: React.FC = () => {
     setUploadedImage(null);
     setPrompt('');
     setStructuredPrompt(null);
+    setInspirationPrompts(null);
     setSelectedStyle(ART_STYLES[0]);
     setError(null);
     setGeneratedImageData(null);
@@ -219,6 +255,7 @@ const App: React.FC = () => {
     setPrompt(item.prompt);
     setGeneratedImageData(item.imageData);
     setStructuredPrompt(null);
+    setInspirationPrompts(null);
     setUploadedImage(null);
     setError(null);
     setIsHistoryOpen(false);
@@ -228,6 +265,8 @@ const App: React.FC = () => {
     clearHistory();
     setHistory([]);
   };
+  
+  const isLoading = isGeneratingFromImage || isGeneratingInspiration || isGeneratingImage;
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
@@ -266,12 +305,24 @@ const App: React.FC = () => {
               image={uploadedImage} 
               onImageChange={handleImageChange} 
               onCreatePrompt={handleCreatePromptFromImage} 
-              isAnalyzingImage={isGeneratingFromImage} 
-              hasPrompt={!!prompt} 
+              onGetInspiration={handleGetInspiration}
+              isAnalyzingImage={isGeneratingFromImage}
+              isGeneratingInspiration={isGeneratingInspiration}
+              showPromptingTools={!!prompt || !!inspirationPrompts}
               onImageRemove={handleFullReset} 
             />
+            
+            {(isGeneratingFromImage || isGeneratingInspiration) && <Spinner />}
+            
+            {inspirationPrompts && (
+              <InspirationList 
+                prompts={inspirationPrompts} 
+                onSelect={handleSelectInspiration}
+              />
+            )}
 
-            {prompt && (
+
+            {prompt && !inspirationPrompts && (
               <div className="space-y-6 animate-fade-in">
                 <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
                   <label className="block text-lg font-semibold text-slate-300 mb-4">
