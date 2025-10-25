@@ -7,7 +7,6 @@ import {
   generatePromptFromImage, 
   generateInspirationFromImage,
   generateImage, 
-  StructuredPrompt as FullStructuredPrompt,
 } from './services/geminiService';
 import { ErrorBanner } from './components/ErrorBanner';
 import { CopyIcon } from './components/icons/CopyIcon';
@@ -22,8 +21,6 @@ import { ImageSkeletonLoader } from './components/ImageSkeletonLoader';
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
 const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
-type StructuredPrompt = Omit<FullStructuredPrompt, 'style'>;
-
 interface AppError {
   message: string;
   onRetry?: () => void;
@@ -34,50 +31,12 @@ const getStyleSuffix = (style: string): string => {
   return `, in the style of ${style.toLowerCase()}`;
 };
 
-const constructPromptFromObject = (p: StructuredPrompt | null, style: string): string => {
-  if (!p) return '';
-  const stylePart = getStyleSuffix(style);
-  return [
-    p.subject,
-    p.setting,
-    p.composition,
-    p.lighting,
-    `using a ${p.colors} color palette`,
-    `evoking a ${p.mood} mood`,
-    stylePart
-  ].filter(Boolean).join(', ').replace(/, ,/g, ',').trim();
-};
-
-const PromptField: React.FC<{
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  area?: boolean;
-}> = ({ label, value, onChange, area }) => {
-  const InputComponent = area ? 'textarea' : 'input';
-  return (
-    <div>
-      <label className="block text-sm font-semibold text-slate-400 mb-1">{label}</label>
-      <InputComponent
-        type="text"
-        rows={area ? 3 : undefined}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-slate-200 focus:ring-1 focus:ring-yellow-500 focus:border-yellow-500 transition-shadow"
-      />
-    </div>
-  );
-};
-
-
 const App: React.FC = () => {
-  // FIX: Removed API Key management state. API key is now handled via environment variables.
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [prompt, setPrompt] = useState('');
-  const [structuredPrompt, setStructuredPrompt] = useState<StructuredPrompt | null>(null);
   const [inspirationPrompts, setInspirationPrompts] = useState<string[] | null>(null);
   const [selectedStyle, setSelectedStyle] = useState(ART_STYLES[0]);
   
@@ -91,10 +50,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     setHistory(getHistory());
-    // FIX: Removed API Key logic from useEffect.
   }, []);
-  
-  // FIX: Removed handleSaveApiKey function.
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -109,7 +65,6 @@ const App: React.FC = () => {
         const base64String = (reader.result as string).split(',')[1];
         setUploadedImage({ data: base64String, mimeType: file.type });
         setPrompt('');
-        setStructuredPrompt(null);
         setInspirationPrompts(null);
         setGeneratedImageData(null);
       };
@@ -117,7 +72,6 @@ const App: React.FC = () => {
     }
   };
 
-  // FIX: Removed apiKey dependency and argument to service call.
   const handleCreatePromptFromImage = useCallback(async () => {
     if (!uploadedImage) {
       return;
@@ -125,17 +79,15 @@ const App: React.FC = () => {
 
     setIsGeneratingFromImage(true);
     setPrompt('');
-    setStructuredPrompt(null);
     setInspirationPrompts(null);
     setError(null);
     try {
       const generated = await generatePromptFromImage(uploadedImage);
-      const { style, ...rest } = generated;
-      const newStyle = style && ART_STYLES.includes(style) ? style : ART_STYLES[0];
+      const newStyle = generated.style && ART_STYLES.includes(generated.style) ? generated.style : (generated.style || ART_STYLES[0]);
+      const fullPrompt = `${generated.prompt}${getStyleSuffix(newStyle)}`;
       
-      setStructuredPrompt(rest);
+      setPrompt(fullPrompt);
       setSelectedStyle(newStyle);
-      setPrompt(constructPromptFromObject(rest, newStyle));
     } catch (err: any) {
       setError({ 
         message: err.message || 'An unexpected error occurred.',
@@ -146,7 +98,6 @@ const App: React.FC = () => {
     }
   }, [uploadedImage]);
   
-  // FIX: Removed apiKey dependency and argument to service call.
   const handleGetInspiration = useCallback(async () => {
     if (!uploadedImage) {
       return;
@@ -154,7 +105,6 @@ const App: React.FC = () => {
   
     setIsGeneratingInspiration(true);
     setPrompt('');
-    setStructuredPrompt(null);
     setInspirationPrompts(null);
     setError(null);
     try {
@@ -173,10 +123,8 @@ const App: React.FC = () => {
   const handleSelectInspiration = (selectedPrompt: string) => {
     setPrompt(selectedPrompt);
     setInspirationPrompts(null);
-    setStructuredPrompt(null); // Switch to manual mode
   };
 
-  // FIX: Removed apiKey dependency and argument to service call.
   const handleGenerateImage = useCallback(async () => {
     if (!prompt.trim()) {
       return;
@@ -200,32 +148,22 @@ const App: React.FC = () => {
     }
   }, [prompt, uploadedImage]);
 
-  const handleStructuredPromptChange = (field: keyof StructuredPrompt, value: string) => {
-    if (!structuredPrompt) return;
-    const newStructuredPrompt = { ...structuredPrompt, [field]: value };
-    setStructuredPrompt(newStructuredPrompt);
-    setPrompt(constructPromptFromObject(newStructuredPrompt, selectedStyle));
-  };
-
   const handleStyleChange = (newStyle: string) => {
-    if (structuredPrompt) {
-        setPrompt(constructPromptFromObject(structuredPrompt, newStyle));
-    } else {
-        const oldSuffix = getStyleSuffix(selectedStyle);
-        const newSuffix = getStyleSuffix(newStyle);
-        let currentBase = prompt;
-        if (oldSuffix && prompt.endsWith(oldSuffix)) {
-            currentBase = prompt.slice(0, prompt.length - oldSuffix.length);
-        }
-        setPrompt(currentBase + newSuffix);
+    const oldSuffix = getStyleSuffix(selectedStyle);
+    const newSuffix = getStyleSuffix(newStyle);
+    
+    let currentBase = prompt;
+    if (oldSuffix && prompt.endsWith(oldSuffix)) {
+        currentBase = prompt.slice(0, prompt.length - oldSuffix.length).trim().replace(/,$/, '').trim();
     }
+    
+    setPrompt(newSuffix ? `${currentBase}${newSuffix}` : currentBase);
     setSelectedStyle(newStyle);
   };
   
   const handleFullReset = () => {
     setUploadedImage(null);
     setPrompt('');
-    setStructuredPrompt(null);
     setInspirationPrompts(null);
     setSelectedStyle(ART_STYLES[0]);
     setError(null);
@@ -254,7 +192,6 @@ const App: React.FC = () => {
   const handleSelectHistoryItem = (item: HistoryItem) => {
     setPrompt(item.prompt);
     setGeneratedImageData(item.imageData);
-    setStructuredPrompt(null);
     setInspirationPrompts(null);
     setUploadedImage(null);
     setError(null);
@@ -268,9 +205,7 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
-      {/* FIX: Removed settings functionality from Header */}
       <Header onHistoryClick={() => setIsHistoryOpen(true)} />
-      {/* FIX: Removed ApiKeyModal */}
       <HistorySidebar
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
@@ -281,8 +216,6 @@ const App: React.FC = () => {
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         <div className="max-w-3xl mx-auto">
-          {/* FIX: Removed API Key banner */}
-
           <div className="space-y-8">
             {error && (
               <ErrorBanner 
@@ -310,38 +243,22 @@ const App: React.FC = () => {
               />
             )}
 
-
             {prompt && !inspirationPrompts && (
               <div className="space-y-6 animate-fade-in">
                 <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
-                  <h2 className="block text-lg font-semibold text-slate-300 mb-4">
-                    1. Refine Your Prompt
-                  </h2>
-
-                  {structuredPrompt && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                      <div className="md:col-span-2">
-                        <PromptField label="Subject" value={structuredPrompt.subject} onChange={v => handleStructuredPromptChange('subject', v)} area />
-                      </div>
-                      <div>
-                        <PromptField label="Setting" value={structuredPrompt.setting} onChange={v => handleStructuredPromptChange('setting', v)} />
-                      </div>
-                      <div>
-                        <PromptField label="Composition" value={structuredPrompt.composition} onChange={v => handleStructuredPromptChange('composition', v)} />
-                      </div>
-                      <div>
-                        <PromptField label="Lighting" value={structuredPrompt.lighting} onChange={v => handleStructuredPromptChange('lighting', v)} />
-                      </div>
-                      <div>
-                        <PromptField label="Color Palette" value={structuredPrompt.colors} onChange={v => handleStructuredPromptChange('colors', v)} />
-                      </div>
-                      <div className="md:col-span-2">
-                        <PromptField label="Mood" value={structuredPrompt.mood} onChange={v => handleStructuredPromptChange('mood', v)} />
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="block text-lg font-semibold text-slate-300">
+                      1. Edit Your Prompt
+                    </h2>
+                    <button 
+                      onClick={handleFullReset}
+                      className="text-sm font-semibold text-slate-400 hover:text-yellow-400 transition-colors px-3 py-1 rounded-md hover:bg-slate-700/50"
+                    >
+                      Start Over
+                    </button>
+                  </div>
                   
-                  <div className="mb-4">
+                  <div className="mb-6">
                     <label className="block text-sm font-semibold text-slate-400 mb-2">
                       Artistic Style
                     </label>
@@ -362,19 +279,13 @@ const App: React.FC = () => {
                   </div>
 
                   <label htmlFor="prompt-editor" className="block text-sm font-semibold text-slate-400 mb-2">
-                    Combined Prompt
+                    Prompt
                   </label>
                   <textarea id="prompt-editor" rows={5}
                     className="w-full bg-slate-900 border border-slate-600 rounded-lg p-4 text-slate-100 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-shadow resize-y"
                     value={prompt} 
-                    onChange={(e) => {
-                      setPrompt(e.target.value);
-                      if (structuredPrompt) {
-                        setStructuredPrompt(null);
-                      }
-                    }}
+                    onChange={(e) => setPrompt(e.target.value)}
                   />
-                  {structuredPrompt && <p className="text-xs text-slate-500 mt-1">Edit the fields above or start typing here to switch to manual mode.</p>}
                 </div>
                 
                 <h2 className="text-lg font-semibold text-slate-300">

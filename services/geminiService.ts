@@ -1,32 +1,22 @@
 
 import { GoogleGenAI, Modality, Type, GenerateContentResponse } from "@google/genai";
 
-export interface StructuredPrompt {
-  subject: string;
-  setting: string;
+export interface GeneratedPrompt {
+  prompt: string;
   style: string;
-  lighting: string;
-  colors: string;
-  composition: string;
-  mood: string;
 }
 
-const imagePromptingSystemInstruction = `You are an expert at analyzing images and creating descriptive prompts for AI image generation. Analyze the provided image and describe it in vivid detail by filling out the JSON schema. Be descriptive and creative.`;
+const imagePromptingSystemInstruction = `You are an expert at analyzing images and creating a single, descriptive prompt for AI image generation. Also identify the primary artistic style. Fill out the JSON schema. The prompt should be a detailed, comma-separated descriptive string for an image generation model, based on the image. It should describe the subject, setting, composition, lighting, colors, and mood, but should NOT include an artistic style phrase like "in the style of...".`;
 
 const inspirationSystemInstruction = `You are a creative assistant for an AI artist. Your task is to look at an image and generate three distinct, creative, and inspiring prompts for a text-to-image model. Each prompt should offer a unique artistic direction, re-imagining the image's subject in a different style, context, or mood. The prompts should be concise but evocative. Return the three prompts as a JSON object with a key 'prompts' containing an array of strings.`;
 
 const promptSchema = {
     type: Type.OBJECT,
     properties: {
-        subject: { type: Type.STRING, description: 'A detailed description of the main subject(s) of the image.' },
-        setting: { type: Type.STRING, description: 'A description of the background, environment, or setting.' },
-        style: { type: Type.STRING, description: 'The artistic style of the image (e.g., Photorealistic, Illustration, Anime, Oil Painting).' },
-        lighting: { type: Type.STRING, description: 'A description of the lighting, such as "soft morning light" or "dramatic studio lighting".' },
-        colors: { type: Type.STRING, description: 'A description of the color palette, such as "vibrant and saturated" or "monochromatic and muted".' },
-        composition: { type: Type.STRING, description: 'A description of the composition, such as "centered close-up" or "wide-angle shot".' },
-        mood: { type: Type.STRING, description: 'The overall mood or feeling of the image, such as "peaceful and serene" or "chaotic and energetic".' },
+        prompt: { type: Type.STRING, description: 'A detailed, comma-separated descriptive prompt for an image generation model, based on the image. This should describe the subject, setting, composition, lighting, colors, and mood, but should NOT include an artistic style phrase like "in the style of...".' },
+        style: { type: Type.STRING, description: 'The primary artistic style of the image (e.g., Photorealistic, Illustration, Anime, Oil Painting, Pixel Art). If none apply, describe the style briefly.' },
     },
-    required: ['subject', 'setting', 'style', 'lighting', 'colors', 'composition', 'mood'],
+    required: ['prompt', 'style'],
 };
 
 const inspirationSchema = {
@@ -77,9 +67,6 @@ function validateResponse(response: GenerateContentResponse) {
             case 'MAX_TOKENS':
                 errorMessage = `The response was cut off because it reached the maximum length. Try a more concise prompt.`;
                 break;
-             case 'PROMPT_BLOCKED':
-                errorMessage = `Your prompt was blocked by the safety filter. Please modify your prompt and try again.`;
-                break;
             default:
                 errorMessage = `The generation failed due to an unhandled reason: ${candidate.finishReason}.`;
                 break;
@@ -92,8 +79,7 @@ function validateResponse(response: GenerateContentResponse) {
     }
 }
 
-// FIX: Refactored to use `process.env.API_KEY` as per the guidelines. Removed `apiKey` parameter.
-export const generatePromptFromImage = async (image: { data: string; mimeType: string; }): Promise<StructuredPrompt> => {
+export const generatePromptFromImage = async (image: { data: string; mimeType: string; }): Promise<GeneratedPrompt> => {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const contents = {
@@ -134,7 +120,6 @@ export const generatePromptFromImage = async (image: { data: string; mimeType: s
     }
 };
 
-// FIX: Refactored to use `process.env.API_KEY` as per the guidelines. Removed `apiKey` parameter.
 export const generateInspirationFromImage = async (image: { data: string; mimeType: string; }): Promise<string[]> => {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -180,7 +165,6 @@ export const generateInspirationFromImage = async (image: { data: string; mimeTy
     }
 };
 
-// FIX: Refactored to use `process.env.API_KEY` as per the guidelines. Removed `apiKey` parameter.
 export const generateImage = async (prompt: string, image: { data: string; mimeType: string; } | null): Promise<string> => {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
