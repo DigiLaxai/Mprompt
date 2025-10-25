@@ -1,10 +1,11 @@
+
 import { GoogleGenAI, Modality } from "@google/genai";
 
 const getAIClient = (apiKey: string) => {
     return new GoogleGenAI({ apiKey });
 };
 
-const imagePromptingSystemInstruction = `You are an expert at analyzing images to create descriptive, editable prompts for AI image generation. Your goal is to create a prompt that allows a user to easily change the setting while keeping the main subject consistent. Describe the main subject (person or character) in detail first, then describe the background/setting. The description should be a single, coherent paragraph. For example: "A photorealistic portrait of a woman with curly red hair, smiling, wearing a black leather jacket, standing on a busy street in New York City at dusk." Do not add any preamble or explanation.`;
+const imagePromptingSystemInstruction = `You are an expert at analyzing images and creating highly detailed, descriptive prompts for AI image generation. Your goal is to capture every possible detail from the image, including the subject's appearance, clothing, expression, pose, the background, lighting, and overall mood. The more detailed the prompt, the better. The description should be a single, coherent paragraph. Do not add any preamble or explanation.`;
 
 interface Image {
     data: string;
