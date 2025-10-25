@@ -4,7 +4,14 @@ import { Header } from './components/Header';
 import { PromptInput } from './components/PromptInput';
 import { Spinner } from './components/Spinner';
 import { Footer } from './components/Footer';
-import { generatePromptFromImage, generateImage, StructuredPrompt as FullStructuredPrompt } from './services/geminiService';
+import { 
+  generatePromptFromImage, 
+  generateImage, 
+  StructuredPrompt as FullStructuredPrompt,
+  initializeApi,
+  isApiInitialized,
+  ApiKeyError
+} from './services/geminiService';
 import { ErrorBanner } from './components/ErrorBanner';
 import { CopyIcon } from './components/icons/CopyIcon';
 import { CheckIcon } from './components/icons/CheckIcon';
@@ -12,8 +19,10 @@ import { WandIcon } from './components/icons/WandIcon';
 import { DownloadIcon } from './components/icons/DownloadIcon';
 import { HistorySidebar } from './components/HistorySidebar';
 import { getHistory, addToHistory, clearHistory, HistoryItem } from './utils/history';
+import { ApiKeyModal } from './components/ApiKeyModal';
 
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
+const API_KEY_STORAGE_KEY = 'gemini-api-key';
 
 type StructuredPrompt = Omit<FullStructuredPrompt, 'style'>;
 
@@ -59,6 +68,8 @@ const PromptField: React.FC<{
 
 
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string>('');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
@@ -76,14 +87,39 @@ const App: React.FC = () => {
 
   useEffect(() => {
     setHistory(getHistory());
+    const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+    if (storedApiKey) {
+        setApiKey(storedApiKey);
+        initializeApi(storedApiKey);
+    } else {
+        setIsApiKeyModalOpen(true);
+    }
   }, []);
+
+  const handleSaveApiKey = (newApiKey: string) => {
+    setApiKey(newApiKey);
+    initializeApi(newApiKey);
+    localStorage.setItem(API_KEY_STORAGE_KEY, newApiKey);
+    setIsApiKeyModalOpen(false);
+  };
 
   const handleApiCall = async (apiFunction: () => Promise<any>) => {
     setError(null);
+    if (!isApiInitialized()) {
+        setIsApiKeyModalOpen(true);
+        const err = new ApiKeyError('Please set your API key first.');
+        setError(err.message);
+        throw err;
+    }
     try {
       return await apiFunction();
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      if (err instanceof ApiKeyError) {
+          setError(err.message);
+          setIsApiKeyModalOpen(true);
+      } else {
+          setError(err.message || 'An unexpected error occurred.');
+      }
       throw err;
     }
   };
@@ -209,7 +245,13 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
-      <Header onHistoryClick={() => setIsHistoryOpen(true)} />
+       <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        onSave={handleSaveApiKey}
+        currentApiKey={apiKey}
+      />
+      <Header onHistoryClick={() => setIsHistoryOpen(true)} onSettingsClick={() => setIsApiKeyModalOpen(true)} />
       <HistorySidebar isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} onSelect={handleSelectHistoryItem} onClear={handleClearHistory} />
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">

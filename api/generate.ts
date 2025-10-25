@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Modality, Type } from "@google/genai";
+import { GoogleGenAI, Modality, Type, GenerateContentResponse, Candidate } from "@google/genai";
 
 // This is a Vercel Serverless Function acting as a backend proxy.
 
@@ -46,6 +46,40 @@ interface Image {
     mimeType: string;
 }
 
+/**
+ * Validates the response from the Gemini API.
+ * Throws an error if the response is invalid, blocked, or empty.
+ * @param response - The GenerateContentResponse from the API.
+ * @returns The first valid Candidate from the response.
+ */
+function validateApiResponse(response: GenerateContentResponse): Candidate {
+    const candidate = response.candidates?.[0];
+
+    if (!candidate) {
+        throw new Error('The AI model did not provide a valid response. This could be due to a network issue or an internal model error.');
+    }
+
+    if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+        let errorMessage = `The model stopped generating for the following reason: ${candidate.finishReason}.`;
+        
+        if (candidate.finishReason === 'SAFETY' && candidate.safetyRatings?.length) {
+            const blockedCategories = candidate.safetyRatings
+                .map(rating => rating.category.replace('HARM_CATEGORY_', ''))
+                .join(', ');
+            
+            errorMessage = `Your request was blocked for safety reasons related to: ${blockedCategories}. Please adjust your input.`;
+        }
+        
+        throw new Error(errorMessage);
+    }
+
+    if (!candidate.content?.parts?.length) {
+        throw new Error('The AI model returned an empty response, which may be due to content safety policies or an internal error.');
+    }
+
+    return candidate;
+}
+
 // Vercel exports a handler function for serverless execution.
 // Note: Vercel's hobby tier might not support TypeScript type annotations for req/res. Using 'any' for broader compatibility.
 export default async function handler(req: any, res: any) {
@@ -86,17 +120,11 @@ export default async function handler(req: any, res: any) {
                 },
             });
 
-            const firstCandidate = response.candidates?.[0];
-            if (!firstCandidate) {
-                 throw new Error('The AI model did not provide a response. This might be due to a network issue or an internal error.');
-            }
-            if (firstCandidate.finishReason && firstCandidate.finishReason !== 'STOP') {
-                throw new Error(`Prompt generation failed. Reason: ${firstCandidate.finishReason}. Please check your input image for any policy violations.`);
-            }
+            const candidate = validateApiResponse(response);
+            const text = candidate.content.parts[0]?.text;
 
-            const text = response.text;
             if (!text) {
-                throw new Error('The AI model returned an empty response.');
+                throw new Error('The AI model returned an empty text response.');
             }
             
             try {
@@ -127,24 +155,15 @@ export default async function handler(req: any, res: any) {
                 },
             });
 
-            const firstCandidate = response.candidates?.[0];
-            if (!firstCandidate) {
-                throw new Error('The AI model did not provide a response. This might be due to a network issue or an internal error.');
-            }
-
-            if (firstCandidate.finishReason && firstCandidate.finishReason !== 'STOP') {
-                throw new Error(`Image generation failed. Reason: ${firstCandidate.finishReason}. Please check your prompt for any policy violations.`);
-            }
-
-            if (firstCandidate.content?.parts) {
-                for (const part of firstCandidate.content.parts) {
-                    if (part.inlineData?.data) {
-                        return res.status(200).json({ result: part.inlineData.data });
-                    }
+            const candidate = validateApiResponse(response);
+            
+            for (const part of candidate.content.parts) {
+                if (part.inlineData?.data) {
+                    return res.status(200).json({ result: part.inlineData.data });
                 }
             }
             
-            const textExplanation = firstCandidate.content?.parts?.find(p => p.text)?.text;
+            const textExplanation = candidate.content.parts.find(p => p.text)?.text;
             if (textExplanation) {
                  throw new Error(`The model did not return an image. It responded with: "${textExplanation}"`);
             }
