@@ -12,7 +12,6 @@ import { WandIcon } from './components/icons/WandIcon';
 import { DownloadIcon } from './components/icons/DownloadIcon';
 import { HistorySidebar } from './components/HistorySidebar';
 import { getHistory, addToHistory, clearHistory, HistoryItem } from './utils/history';
-import { ApiKeyPrompt } from './components/ApiKeyPrompt';
 
 
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
@@ -36,8 +35,6 @@ const App: React.FC = () => {
   
   const [error, setError] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
-
-  const apiKey = process.env.API_KEY;
 
   useEffect(() => {
     setHistory(getHistory());
@@ -160,10 +157,6 @@ const App: React.FC = () => {
     setHistory([]);
     setIsHistoryOpen(false);
   };
-  
-  if (!apiKey) {
-    return <ApiKeyPrompt />;
-  }
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
