@@ -1,5 +1,7 @@
 
-import { GoogleGenAI, Modality, Type, GenerateContentResponse, Candidate } from "@google/genai";
+
+// FIX: Use ES module import instead of require for TypeScript compatibility.
+import { GoogleGenAI, Modality, Type } from "@google/genai";
 
 // This is a Vercel Serverless Function acting as a backend proxy.
 
@@ -52,7 +54,7 @@ interface Image {
  * @param response - The GenerateContentResponse from the API.
  * @returns The first valid Candidate from the response.
  */
-function validateApiResponse(response: GenerateContentResponse): Candidate {
+function validateApiResponse(response: any) {
     const candidate = response.candidates?.[0];
 
     if (!candidate) {
@@ -64,7 +66,7 @@ function validateApiResponse(response: GenerateContentResponse): Candidate {
         
         if (candidate.finishReason === 'SAFETY' && candidate.safetyRatings?.length) {
             const blockedCategories = candidate.safetyRatings
-                .map(rating => rating.category.replace('HARM_CATEGORY_', ''))
+                .map((rating: any) => rating.category.replace('HARM_CATEGORY_', ''))
                 .join(', ');
             
             errorMessage = `Your request was blocked for safety reasons related to: ${blockedCategories}. Please adjust your input.`;
@@ -81,8 +83,8 @@ function validateApiResponse(response: GenerateContentResponse): Candidate {
 }
 
 // Vercel exports a handler function for serverless execution.
-// Note: Vercel's hobby tier might not support TypeScript type annotations for req/res. Using 'any' for broader compatibility.
-export default async function handler(req: any, res: any) {
+// FIX: Use ES module export default instead of module.exports for TypeScript compatibility.
+export default async (req: any, res: any) => {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
@@ -163,7 +165,7 @@ export default async function handler(req: any, res: any) {
                 }
             }
             
-            const textExplanation = candidate.content.parts.find(p => p.text)?.text;
+            const textExplanation = candidate.content.parts.find((p: any) => p.text)?.text;
             if (textExplanation) {
                  throw new Error(`The model did not return an image. It responded with: "${textExplanation}"`);
             }

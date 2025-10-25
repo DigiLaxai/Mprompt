@@ -14,9 +14,11 @@ import { CopyIcon } from './components/icons/CopyIcon';
 import { CheckIcon } from './components/icons/CheckIcon';
 import { WandIcon } from './components/icons/WandIcon';
 import { DownloadIcon } from './components/icons/DownloadIcon';
+import { ApiKeyModal } from './components/ApiKeyModal';
 import { HistorySidebar } from './components/HistorySidebar';
 import { getHistory, addToHistory, clearHistory, HistoryItem } from './utils/history';
 
+const API_KEY_STORAGE_KEY = 'gemini-api-key';
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
 
 type StructuredPrompt = Omit<FullStructuredPrompt, 'style'>;
@@ -63,6 +65,8 @@ const PromptField: React.FC<{
 
 
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
@@ -79,8 +83,27 @@ const App: React.FC = () => {
   const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
+    const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+    if (storedApiKey) {
+      setApiKey(storedApiKey);
+    } else {
+      setIsApiKeyModalOpen(true);
+    }
     setHistory(getHistory());
   }, []);
+
+  const handleApiKeySave = (newKey: string) => {
+    setApiKey(newKey);
+    localStorage.setItem(API_KEY_STORAGE_KEY, newKey);
+  };
+
+  const ensureApiKey = () => {
+    if (!apiKey) {
+      setIsApiKeyModalOpen(true);
+      return false;
+    }
+    return true;
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -98,14 +121,14 @@ const App: React.FC = () => {
   };
 
   const handleCreatePromptFromImage = useCallback(async () => {
-    if (!uploadedImage) return;
+    if (!uploadedImage || !ensureApiKey()) return;
 
     setIsGeneratingFromImage(true);
     setPrompt('');
     setStructuredPrompt(null);
     setError(null);
     try {
-      const generated = await generatePromptFromImage(uploadedImage);
+      const generated = await generatePromptFromImage(apiKey!, uploadedImage);
       const { style, ...rest } = generated;
       const newStyle = style || ART_STYLES[0];
       
@@ -117,16 +140,16 @@ const App: React.FC = () => {
     } finally {
       setIsGeneratingFromImage(false);
     }
-  }, [uploadedImage]);
+  }, [apiKey, uploadedImage]);
 
   const handleGenerateImage = useCallback(async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || !ensureApiKey()) return;
 
     setIsGeneratingImage(true);
     setGeneratedImageData(null);
     setError(null);
     try {
-      const imageData = await generateImage(prompt, uploadedImage);
+      const imageData = await generateImage(apiKey!, prompt, uploadedImage);
       setGeneratedImageData(imageData);
       const newHistory = addToHistory({ prompt, imageData });
       setHistory(newHistory);
@@ -135,7 +158,7 @@ const App: React.FC = () => {
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [prompt, uploadedImage]);
+  }, [apiKey, prompt, uploadedImage]);
 
   const handleStructuredPromptChange = (field: keyof StructuredPrompt, value: string) => {
     if (!structuredPrompt) return;
@@ -188,25 +211,35 @@ const App: React.FC = () => {
   };
 
   const handleSelectHistoryItem = (item: HistoryItem) => {
-    setUploadedImage(null);
     setPrompt(item.prompt);
-    setStructuredPrompt(null); // No structured data from history
     setGeneratedImageData(item.imageData);
-    setSelectedStyle(ART_STYLES[0]); // Reset style or try to parse from prompt
+    setStructuredPrompt(null);
+    setUploadedImage(null);
     setError(null);
     setIsHistoryOpen(false);
   };
-
+  
   const handleClearHistory = () => {
     clearHistory();
     setHistory([]);
-    setIsHistoryOpen(false);
   };
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
-      <Header onHistoryClick={() => setIsHistoryOpen(true)} />
-      <HistorySidebar isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} onSelect={handleSelectHistoryItem} onClear={handleClearHistory} />
+      <Header onSettingsClick={() => setIsApiKeyModalOpen(true)} onHistoryClick={() => setIsHistoryOpen(true)} />
+      <ApiKeyModal 
+        isOpen={isApiKeyModalOpen} 
+        onClose={() => setIsApiKeyModalOpen(false)} 
+        onSave={handleApiKeySave} 
+        currentApiKey={apiKey} 
+      />
+      <HistorySidebar
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        history={history}
+        onSelect={handleSelectHistoryItem}
+        onClear={handleClearHistory}
+      />
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         <div className="max-w-3xl mx-auto space-y-8">
