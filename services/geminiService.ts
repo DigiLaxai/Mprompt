@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Modality } from "@google/genai";
 
 export class RateLimitError extends Error {
@@ -21,12 +20,33 @@ const handleApiError = (error: any) => {
     throw new Error(error?.message || 'An unknown error occurred with the Gemini API.');
 }
 
+const textPromptingSystemInstruction = `You are an expert at creating prompts for AI image generation. The user will give you a simple idea, and your task is to expand it into a detailed, vivid, and imaginative prompt. The prompt should be a single, coherent paragraph. Describe the main subject, the setting, the style (e.g., photorealistic, illustration, fantasy), lighting, color palette, composition, and overall mood. Do not add any preamble or explanation.`;
 const imagePromptingSystemInstruction = `You are an expert at analyzing images and creating descriptive prompts for AI image generation. Describe the provided image in vivid detail. Cover the main subject, the background/setting, the artistic style (e.g., photorealistic, illustration, painting), the lighting, the color palette, composition, and overall mood. The description must be a single, coherent paragraph suitable for use as a prompt for a text-to-image AI model. Do not add any preamble or explanation.`;
 
 interface Image {
     data: string;
     mimeType: string;
 }
+
+export const generatePromptFromText = async (idea: string): Promise<string> => {
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `Expand this idea into a detailed image prompt: "${idea}"`,
+            config: {
+                systemInstruction: textPromptingSystemInstruction,
+                temperature: 0.7,
+            },
+        });
+
+        return response.text.trim();
+    } catch (error) {
+        handleApiError(error);
+        return ""; // Should not be reached
+    }
+};
 
 export const generatePromptFromImage = async (image: Image): Promise<string> => {
     try {
