@@ -61,17 +61,10 @@ function validateResponse(response: GenerateContentResponse) {
     }
 }
 
-const getAiClient = (apiKey: string) => {
-    if (!apiKey) {
-        throw new Error('API key must be set. Please add your Gemini API key in the settings menu.');
-    }
-    return new GoogleGenAI({ apiKey });
-};
-
-
 export const generatePromptFromImage = async (apiKey: string, image: { data: string; mimeType: string; }): Promise<StructuredPrompt> => {
     try {
-        const ai = getAiClient(apiKey);
+        if (!apiKey) throw new Error("An API Key must be set when running in a browser");
+        const ai = new GoogleGenAI({ apiKey });
         const contents = {
             parts: [{
                 inlineData: { data: image.data, mimeType: image.mimeType },
@@ -106,16 +99,14 @@ export const generatePromptFromImage = async (apiKey: string, image: { data: str
         }
     } catch (error: any) {
         console.error("Gemini API Error (generatePromptFromImage):", error);
-        if (error.message.includes('API key not valid')) {
-            throw new Error('Your API key is not valid. Please check it in the settings.');
-        }
         throw new Error(error.message || 'An unexpected error occurred while generating the prompt.');
     }
 };
 
 export const generateInspirationFromImage = async (apiKey: string, image: { data: string; mimeType: string; }): Promise<string[]> => {
     try {
-        const ai = getAiClient(apiKey);
+        if (!apiKey) throw new Error("An API Key must be set when running in a browser");
+        const ai = new GoogleGenAI({ apiKey });
         const contents = {
             parts: [{
                 inlineData: { data: image.data, mimeType: image.mimeType },
@@ -154,16 +145,14 @@ export const generateInspirationFromImage = async (apiKey: string, image: { data
         }
     } catch (error: any) {
         console.error("Gemini API Error (generateInspirationFromImage):", error);
-        if (error.message.includes('API key not valid')) {
-            throw new Error('Your API key is not valid. Please check it in the settings.');
-        }
         throw new Error(error.message || 'An unexpected error occurred while generating inspiration.');
     }
 };
 
 export const generateImage = async (apiKey: string, prompt: string, image: { data: string; mimeType: string; } | null): Promise<string> => {
     try {
-        const ai = getAiClient(apiKey);
+        if (!apiKey) throw new Error("An API Key must be set when running in a browser");
+        const ai = new GoogleGenAI({ apiKey });
         const parts: any[] = [];
         let finalPrompt = prompt;
 
@@ -202,9 +191,6 @@ export const generateImage = async (apiKey: string, prompt: string, image: { dat
         throw new Error('No image data was found in the API response. The response may have been blocked or empty.');
     } catch (error: any) {
         console.error("Gemini API Error (generateImage):", error);
-        if (error.message.includes('API key not valid')) {
-            throw new Error('Your API key is not valid. Please check it in the settings.');
-        }
         throw new Error(error.message || 'An unexpected error occurred while generating the image.');
     }
 };

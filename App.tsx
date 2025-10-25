@@ -16,9 +16,9 @@ import { WandIcon } from './components/icons/WandIcon';
 import { DownloadIcon } from './components/icons/DownloadIcon';
 import { HistorySidebar } from './components/HistorySidebar';
 import { getHistory, addToHistory, clearHistory, HistoryItem } from './utils/history';
+import { InspirationList } from './components/InspirationList';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { KeyIcon } from './components/icons/KeyIcon';
-import { InspirationList } from './components/InspirationList';
 
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
 
@@ -66,8 +66,8 @@ const PromptField: React.FC<{
 
 
 const App: React.FC = () => {
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
@@ -86,22 +86,19 @@ const App: React.FC = () => {
   const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
+    setHistory(getHistory());
     const storedKey = localStorage.getItem('gemini-api-key');
     if (storedKey) {
         setApiKey(storedKey);
     } else {
-        setIsSettingsOpen(true);
+        setIsApiKeyModalOpen(true);
     }
-    setHistory(getHistory());
   }, []);
-
-  const handleSaveApiKey = (newKey: string) => {
-    setApiKey(newKey);
-    localStorage.setItem('gemini-api-key', newKey);
-    setIsSettingsOpen(false);
-    if (error?.toLowerCase().includes('api key')) {
-        setError(null);
-    }
+  
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem('gemini-api-key', key);
+    setError(null);
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -121,10 +118,8 @@ const App: React.FC = () => {
   };
 
   const handleCreatePromptFromImage = useCallback(async () => {
-    if (!uploadedImage) return;
-    if (!apiKey) {
-      setError("Please set your Gemini API key in the settings.");
-      setIsSettingsOpen(true);
+    if (!uploadedImage || !apiKey) {
+      if (!apiKey) setError("Please set your API key in the settings.");
       return;
     }
 
@@ -149,10 +144,8 @@ const App: React.FC = () => {
   }, [uploadedImage, apiKey]);
   
   const handleGetInspiration = useCallback(async () => {
-    if (!uploadedImage) return;
-    if (!apiKey) {
-      setError("Please set your Gemini API key in the settings.");
-      setIsSettingsOpen(true);
+    if (!uploadedImage || !apiKey) {
+      if (!apiKey) setError("Please set your API key in the settings.");
       return;
     }
   
@@ -178,10 +171,8 @@ const App: React.FC = () => {
   };
 
   const handleGenerateImage = useCallback(async () => {
-    if (!prompt.trim()) return;
-     if (!apiKey) {
-      setError("Please set your Gemini API key in the settings.");
-      setIsSettingsOpen(true);
+    if (!prompt.trim() || !apiKey) {
+      if (!apiKey) setError("Please set your API key in the settings.");
       return;
     }
 
@@ -270,10 +261,10 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
-      <Header onHistoryClick={() => setIsHistoryOpen(true)} onSettingsClick={() => setIsSettingsOpen(true)} />
-      <ApiKeyModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+      <Header onHistoryClick={() => setIsHistoryOpen(true)} onSettingsClick={() => setIsApiKeyModalOpen(true)} />
+      <ApiKeyModal 
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
         onSave={handleSaveApiKey}
         currentApiKey={apiKey}
       />
@@ -287,17 +278,21 @@ const App: React.FC = () => {
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         <div className="max-w-3xl mx-auto">
-          {!apiKey && (
-            <div className="bg-yellow-900/50 border border-yellow-700 text-yellow-200 px-4 py-3 rounded-lg flex items-center justify-between gap-4 mb-8">
-              <div className="flex items-center gap-3">
-                <KeyIcon className="w-6 h-6 flex-shrink-0" />
-                <p className="text-sm font-medium">Please set your Gemini API key to use the app.</p>
+          {!apiKey && !isApiKeyModalOpen && (
+              <div className="bg-yellow-900/50 border border-yellow-700 text-yellow-300 px-4 py-3 rounded-lg flex items-center justify-between gap-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <KeyIcon className="w-6 h-6 flex-shrink-0" />
+                  <p className="text-sm font-medium">Your Gemini API Key is not set.</p>
+                </div>
+                <button
+                  onClick={() => setIsApiKeyModalOpen(true)}
+                  className="bg-yellow-500 text-slate-900 font-bold py-1 px-3 rounded-md hover:bg-yellow-400 transition-colors text-sm"
+                >
+                  Set Key
+                </button>
               </div>
-              <button onClick={() => setIsSettingsOpen(true)} className="bg-yellow-500 text-slate-900 font-bold py-1.5 px-3 rounded-md hover:bg-yellow-400 text-sm whitespace-nowrap">
-                Open Settings
-              </button>
-            </div>
           )}
+
           <div className="space-y-8">
             {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
             

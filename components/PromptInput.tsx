@@ -1,4 +1,3 @@
-
 import React, { useRef } from 'react';
 import { ImageIcon } from './icons/ImageIcon';
 import { XIcon } from './icons/XIcon';
@@ -44,7 +43,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
       
       {!image ? (
         <>
-          <h2 className="text-xl font-semibold mb-4 text-center text-slate-300">Start Your Creation</h2>
+          <h2 className="text-xl font-semibold mb-4 text-center text-slate-300">Craft Your Prompt</h2>
           <div 
             onClick={handleImageUploadClick}
             className={`relative block w-full border-2 border-dashed border-slate-600 rounded-lg p-12 text-center transition-colors ${isLoading ? 'cursor-not-allowed opacity-50' : 'hover:border-yellow-500 cursor-pointer'}`}
