@@ -40,7 +40,13 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ isOpen, onClose,
                   onClick={() => onLoad(item)}
                 >
                   <div className="w-16 h-16 flex-shrink-0 bg-slate-700 rounded-md flex items-center justify-center">
-                    {item.uploadedImage ? (
+                    {item.generatedImage ? (
+                       <img 
+                        src={`data:${item.generatedImage.mimeType};base64,${item.generatedImage.data}`}
+                        alt="Generated thumbnail"
+                        className="w-full h-full object-cover rounded-md"
+                      />
+                    ) : item.uploadedImage ? (
                       <img 
                         src={`data:${item.uploadedImage.mimeType};base64,${item.uploadedImage.data}`}
                         alt="Uploaded thumbnail"

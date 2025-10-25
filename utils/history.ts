@@ -3,6 +3,7 @@ export interface HistoryItem {
     uploadedImage: { data: string; mimeType: string; } | null;
     basePrompt: string;
     selectedStyle: string;
+    generatedImage?: { data: string; mimeType: string; } | null;
 }
 
 const HISTORY_KEY = 'promptcraft-history';
