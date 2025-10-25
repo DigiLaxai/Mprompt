@@ -17,6 +17,8 @@ import { getHistory, addToHistory, clearHistory, HistoryItem } from './utils/his
 import { InspirationList } from './components/InspirationList';
 import { GeneratedImageView } from './components/GeneratedImageView';
 import { ImageSkeletonLoader } from './components/ImageSkeletonLoader';
+import { ApiKeyModal } from './components/ApiKeyModal';
+import { getApiKey, saveApiKey } from './utils/apiKey';
 
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
 const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -32,6 +34,9 @@ const getStyleSuffix = (style: string): string => {
 };
 
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState('');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
@@ -49,8 +54,20 @@ const App: React.FC = () => {
   const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
+    const storedKey = getApiKey();
+    if (storedKey) {
+      setApiKey(storedKey);
+    } else {
+      setIsApiKeyModalOpen(true);
+    }
     setHistory(getHistory());
   }, []);
+
+  const handleSaveApiKey = (newKey: string) => {
+    saveApiKey(newKey);
+    setApiKey(newKey);
+    setIsApiKeyModalOpen(false);
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -73,16 +90,14 @@ const App: React.FC = () => {
   };
 
   const handleCreatePromptFromImage = useCallback(async () => {
-    if (!uploadedImage) {
-      return;
-    }
+    if (!uploadedImage) return;
 
     setIsGeneratingFromImage(true);
     setPrompt('');
     setInspirationPrompts(null);
     setError(null);
     try {
-      const generated = await generatePromptFromImage(uploadedImage);
+      const generated = await generatePromptFromImage(uploadedImage, apiKey);
       const newStyle = generated.style && ART_STYLES.includes(generated.style) ? generated.style : (generated.style || ART_STYLES[0]);
       const fullPrompt = `${generated.prompt}${getStyleSuffix(newStyle)}`;
       
@@ -96,19 +111,17 @@ const App: React.FC = () => {
     } finally {
       setIsGeneratingFromImage(false);
     }
-  }, [uploadedImage]);
+  }, [uploadedImage, apiKey]);
   
   const handleGetInspiration = useCallback(async () => {
-    if (!uploadedImage) {
-      return;
-    }
+    if (!uploadedImage) return;
   
     setIsGeneratingInspiration(true);
     setPrompt('');
     setInspirationPrompts(null);
     setError(null);
     try {
-      const prompts = await generateInspirationFromImage(uploadedImage);
+      const prompts = await generateInspirationFromImage(uploadedImage, apiKey);
       setInspirationPrompts(prompts);
     } catch (err: any) {
       setError({
@@ -118,7 +131,7 @@ const App: React.FC = () => {
     } finally {
       setIsGeneratingInspiration(false);
     }
-  }, [uploadedImage]);
+  }, [uploadedImage, apiKey]);
 
   const handleSelectInspiration = (selectedPrompt: string) => {
     setPrompt(selectedPrompt);
@@ -126,15 +139,13 @@ const App: React.FC = () => {
   };
 
   const handleGenerateImage = useCallback(async () => {
-    if (!prompt.trim()) {
-      return;
-    }
+    if (!prompt.trim()) return;
 
     setIsGeneratingImage(true);
     setGeneratedImageData(null);
     setError(null);
     try {
-      const imageData = await generateImage(prompt, uploadedImage);
+      const imageData = await generateImage(prompt, uploadedImage, apiKey);
       setGeneratedImageData(imageData);
       const newHistory = addToHistory({ prompt, imageData });
       setHistory(newHistory);
@@ -146,7 +157,7 @@ const App: React.FC = () => {
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [prompt, uploadedImage]);
+  }, [prompt, uploadedImage, apiKey]);
 
   const handleStyleChange = (newStyle: string) => {
     const oldSuffix = getStyleSuffix(selectedStyle);
@@ -183,17 +194,15 @@ const App: React.FC = () => {
     const link = document.createElement('a');
     link.href = `data:image/png;base64,${generatedImageData}`;
     
-    // Final, more robust sanitation logic
     const sanitized = prompt
-      .trim()                         // 1. Remove leading/trailing whitespace
-      .toLowerCase()                  // 2. Convert to lowercase
-      .replace(/[^a-z0-9\s]+/g, '')   // 3. Remove all non-alphanumeric/non-whitespace characters
-      .replace(/\s+/g, '-')           // 4. Replace whitespace with hyphens
-      .slice(0, 75)                   // 5. Truncate to a reasonable length
-      .replace(/-+$/, '')             // 6. Remove any trailing hyphens from truncation
-      .replace(/^-+/, '');             // 7. Remove any leading hyphens (edge case)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]+/g, '')
+      .replace(/\s+/g, '-')
+      .slice(0, 75)
+      .replace(/-+$/, '')
+      .replace(/^-+/, '');
 
-    // Fallback if the prompt was only special characters
     const filename = sanitized || 'promptcraft-generated-image';
     link.download = `${filename}.png`;
     document.body.appendChild(link);
@@ -217,13 +226,22 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
-      <Header onHistoryClick={() => setIsHistoryOpen(true)} />
+      <Header 
+        onHistoryClick={() => setIsHistoryOpen(true)} 
+        onSettingsClick={() => setIsApiKeyModalOpen(true)}
+      />
       <HistorySidebar
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         history={history}
         onSelect={handleSelectHistoryItem}
         onClear={handleClearHistory}
+      />
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        onSave={handleSaveApiKey}
+        currentApiKey={apiKey}
       />
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">

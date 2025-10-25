@@ -37,6 +37,8 @@ const processApiError = (error: any): Error => {
     const lowerCaseMessage = error.message.toLowerCase();
     if (lowerCaseMessage.includes('api key not valid') || lowerCaseMessage.includes('permission denied')) {
       message = 'Your API key is invalid or lacks permissions. Please check your key and try again.';
+    } else if (lowerCaseMessage.includes('api key must be set')) {
+      message = 'Your API key is not set. Please add it in the settings.';
     } else if (lowerCaseMessage.includes('quota')) {
       message = 'You have exceeded your API quota. Please check your Google AI Studio account for details.';
     } else if (lowerCaseMessage.includes('network') || lowerCaseMessage.includes('failed to fetch')) {
@@ -79,9 +81,10 @@ function validateResponse(response: GenerateContentResponse) {
     }
 }
 
-export const generatePromptFromImage = async (image: { data: string; mimeType: string; }): Promise<GeneratedPrompt> => {
+export const generatePromptFromImage = async (image: { data: string; mimeType: string; }, apiKey: string): Promise<GeneratedPrompt> => {
+    if (!apiKey) throw new Error('API Key not found. Please set your API key in the settings.');
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         const contents = {
             parts: [{
                 inlineData: { data: image.data, mimeType: image.mimeType },
@@ -120,9 +123,10 @@ export const generatePromptFromImage = async (image: { data: string; mimeType: s
     }
 };
 
-export const generateInspirationFromImage = async (image: { data: string; mimeType: string; }): Promise<string[]> => {
+export const generateInspirationFromImage = async (image: { data: string; mimeType: string; }, apiKey: string): Promise<string[]> => {
+    if (!apiKey) throw new Error('API Key not found. Please set your API key in the settings.');
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         const contents = {
             parts: [{
                 inlineData: { data: image.data, mimeType: image.mimeType },
@@ -165,9 +169,10 @@ export const generateInspirationFromImage = async (image: { data: string; mimeTy
     }
 };
 
-export const generateImage = async (prompt: string, image: { data: string; mimeType: string; } | null): Promise<string> => {
+export const generateImage = async (prompt: string, image: { data: string; mimeType: string; } | null, apiKey: string): Promise<string> => {
+    if (!apiKey) throw new Error('API Key not found. Please set your API key in the settings.');
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         const parts: any[] = [];
         let finalPrompt = prompt;
 
