@@ -15,22 +15,10 @@ import { WandIcon } from './components/icons/WandIcon';
 import { GeneratedImageModal } from './components/GeneratedImageModal';
 import { ApiKeySelector } from './components/ApiKeySelector';
 
-// Fix: Use a named interface 'AIStudio' for window.aistudio to resolve declaration conflicts as indicated by the TypeScript error.
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    // FIX: Made `aistudio` optional to resolve declaration conflict errors.
-    // This aligns with runtime checks for its existence.
-    aistudio?: AIStudio;
-  }
-}
-
 type Stage = 'UPLOADING' | 'PROMPTING';
 
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
+const API_KEY_STORAGE_KEY = 'gemini-api-key';
 
 const getStyleSuffix = (style: string): string => {
   if (!style || style === 'None') {
@@ -40,8 +28,8 @@ const getStyleSuffix = (style: string): string => {
 };
 
 const App: React.FC = () => {
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [stage, setStage] = useState<Stage>('UPLOADING');
@@ -60,37 +48,18 @@ const App: React.FC = () => {
   const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
-    const checkApiKey = async () => {
-      try {
-        if (window.aistudio) {
-          const hasKey = await window.aistudio.hasSelectedApiKey();
-          setHasApiKey(hasKey);
-        }
-      } catch (e) {
-        console.error("Error checking for API key:", e);
-        setHasApiKey(false);
-      } finally {
-        setIsCheckingApiKey(false);
-      }
-    };
-    checkApiKey();
+    const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+    if (storedKey) {
+      setApiKey(storedKey);
+    }
+    setIsInitializing(false);
     setHistory(getHistory());
   }, []);
 
-  const handleSelectKey = async () => {
-    try {
-      // FIX: Added a check for window.aistudio to prevent runtime errors
-      // and satisfy TypeScript's strict null checks since it's now optional.
-      if (window.aistudio) {
-        await window.aistudio.openSelectKey();
-        // Assume success and re-render the app
-        setHasApiKey(true);
-        setError(null);
-      }
-    } catch (e) {
-      console.error("Error opening API key selection:", e);
-      setError("Could not open the API key selection dialog.");
-    }
+  const handleKeySubmit = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem(API_KEY_STORAGE_KEY, key);
+    setError(null);
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,13 +87,13 @@ const App: React.FC = () => {
   };
   
   const handleCreatePrompt = useCallback(async () => {
-    if (!uploadedImage) return;
+    if (!uploadedImage || !apiKey) return;
 
     setIsLoadingPrompt(true);
     setError(null);
     setGeneratedImage(null);
     try {
-      const prompt = await generatePromptFromImage(uploadedImage);
+      const prompt = await generatePromptFromImage(uploadedImage, apiKey);
       const defaultStyle = ART_STYLES[0];
       
       setEditablePrompt(prompt + getStyleSuffix(defaultStyle));
@@ -142,9 +111,10 @@ const App: React.FC = () => {
 
       setStage('PROMPTING');
     } catch (err: any) {
-      if (err.message?.includes('Requested entity was not found')) {
-        setError('Your API key may be invalid. Please select a new one.');
-        setHasApiKey(false);
+      if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
+        setError('Your API key is invalid. Please enter a new one.');
+        localStorage.removeItem(API_KEY_STORAGE_KEY);
+        setApiKey(null);
       } else {
         setError(err.message || 'Failed to generate prompt from image.');
       }
@@ -152,7 +122,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoadingPrompt(false);
     }
-  }, [uploadedImage, history]);
+  }, [uploadedImage, history, apiKey]);
 
   const handleStyleChange = (newStyle: string) => {
     const oldSuffix = getStyleSuffix(selectedStyle);
@@ -202,12 +172,12 @@ const App: React.FC = () => {
   }, [editablePrompt]);
 
   const handleGenerateImage = useCallback(async () => {
-      if (!editablePrompt.trim()) return;
+      if (!editablePrompt.trim() || !apiKey) return;
 
       setIsGeneratingImage(true);
       setError(null);
       try {
-        const image = await generateImageFromPrompt(editablePrompt);
+        const image = await generateImageFromPrompt(editablePrompt, apiKey);
         setGeneratedImage(image);
         setIsModalOpen(true);
 
@@ -220,21 +190,22 @@ const App: React.FC = () => {
           saveHistory(updatedHistory);
         }
       } catch (err: any) {
-        if (err.message?.includes('Requested entity was not found')) {
-          setError('Your API key may be invalid. Please select a new one.');
-          setHasApiKey(false);
+        if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
+          setError('Your API key is invalid. Please enter a new one.');
+          localStorage.removeItem(API_KEY_STORAGE_KEY);
+          setApiKey(null);
         } else {
           setError(err.message || 'Failed to generate image.');
         }
       } finally {
         setIsGeneratingImage(false);
       }
-  }, [editablePrompt, history, selectedStyle]);
+  }, [editablePrompt, history, selectedStyle, apiKey]);
 
 
   const handleClearError = () => setError(null);
 
-  if (isCheckingApiKey) {
+  if (isInitializing) {
     return (
       <div className="bg-slate-900 min-h-screen flex items-center justify-center">
         <Spinner />
@@ -242,13 +213,13 @@ const App: React.FC = () => {
     );
   }
 
-  if (!hasApiKey) {
+  if (!apiKey) {
     return (
       <div className="bg-slate-900 min-h-screen">
           <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 h-full flex items-center justify-center">
             <div className="max-w-md w-full">
               {error && <ErrorBanner message={error} onDismiss={handleClearError} />}
-              <ApiKeySelector onSelectKey={handleSelectKey} />
+              <ApiKeySelector onKeySubmit={handleKeySubmit} />
             </div>
           </main>
       </div>
