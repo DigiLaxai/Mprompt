@@ -1,24 +1,6 @@
 
-import { GoogleGenAI, Type, Modality, GenerateContentResponse, Candidate, Part } from "@google/genai";
-
-let ai: GoogleGenAI | null = null;
-
-export class ApiKeyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ApiKeyError';
-  }
-}
-
-export const initializeApi = (apiKey: string) => {
-  if (!apiKey) {
-    ai = null;
-    return;
-  }
-  ai = new GoogleGenAI({ apiKey });
-};
-
-export const isApiInitialized = (): boolean => !!ai;
+// This file uses a backend proxy to securely communicate with the Google AI API.
+// The API key is managed on the server, not in the client.
 
 export interface StructuredPrompt {
   subject: string;
@@ -30,139 +12,47 @@ export interface StructuredPrompt {
   mood: string;
 }
 
-const imagePromptingSystemInstruction = `You are an expert at analyzing images and creating descriptive prompts for AI image generation. Analyze the provided image and describe it in vivid detail by filling out the JSON schema. Be descriptive and creative.`;
+/**
+ * A wrapper to call our backend API proxy.
+ * @param action The specific AI action to perform ('generatePrompt' or 'generateImage').
+ * @param body The payload for the action.
+ * @returns The result from the AI model.
+ */
+const callApiProxy = async <T>(action: string, body: object): Promise<T> => {
+    const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action, ...body }),
+    });
 
-const promptSchema = {
-    type: Type.OBJECT,
-    properties: {
-        subject: { type: Type.STRING, description: 'A detailed description of the main subject(s) of the image.' },
-        setting: { type: Type.STRING, description: 'A description of the background, environment, or setting.' },
-        style: { type: Type.STRING, description: 'The artistic style of the image (e.g., Photorealistic, Illustration, Anime, Oil Painting).' },
-        lighting: { type: Type.STRING, description: 'A description of the lighting, such as "soft morning light" or "dramatic studio lighting".' },
-        colors: { type: Type.STRING, description: 'A description of the color palette, such as "vibrant and saturated" or "monochromatic and muted".' },
-        composition: { type: Type.STRING, description: 'A description of the composition, such as "centered close-up" or "wide-angle shot".' },
-        mood: { type: Type.STRING, description: 'The overall mood or feeling of the image, such as "peaceful and serene" or "chaotic and energetic".' },
-    },
-    required: ['subject', 'setting', 'style', 'lighting', 'colors', 'composition', 'mood'],
+    const data = await response.json();
+
+    if (!response.ok) {
+        // The backend provides a specific error message in the 'error' property.
+        throw new Error(data.error || 'An unknown error occurred while communicating with the server.');
+    }
+
+    return data.result;
 };
 
-
-function validateApiResponse(response: GenerateContentResponse): Candidate {
-    const candidate = response.candidates?.[0];
-
-    if (!candidate) {
-        throw new Error('The AI model did not provide a valid response.');
-    }
-
-    if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-        let errorMessage = `The model stopped generating for the following reason: ${candidate.finishReason}.`;
-        
-        if (candidate.finishReason === 'SAFETY' && candidate.safetyRatings?.length) {
-            const blockedCategories = candidate.safetyRatings
-                .map(rating => rating.category.replace('HARM_CATEGORY_', ''))
-                .join(', ');
-            
-            errorMessage = `Your request was blocked for safety reasons related to: ${blockedCategories}. Please adjust your input.`;
-        }
-        
-        throw new Error(errorMessage);
-    }
-
-    if (!candidate.content?.parts?.length) {
-        throw new Error('The AI model returned an empty response, which may be due to content safety policies or an internal error.');
-    }
-
-    return candidate;
-}
-
-const handleApiError = (error: any): never => {
-    console.error("Gemini API Error:", error);
-    if (error.message?.includes('API key not valid')) {
-        throw new ApiKeyError('Your API key is invalid. Please check it and try again.');
-    }
-    if (error.message?.toLowerCase().includes('quota') || error.message?.includes('429')) {
-         throw new Error("You've exceeded the API's free tier limit. Please wait a moment and try again or check your billing status.");
-    }
-    throw new Error(error.message || 'An unknown error occurred while communicating with the AI service.');
-};
-
-
+/**
+ * Calls the backend to generate a structured prompt from an image.
+ * @param image The image data and MIME type.
+ * @returns A promise that resolves to a StructuredPrompt object.
+ */
 export const generatePromptFromImage = async (image: { data: string; mimeType: string; }): Promise<StructuredPrompt> => {
-    if (!ai) throw new ApiKeyError('API is not initialized. Please provide your Google AI API key.');
-
-    try {
-        const contents = {
-            parts: [{
-                inlineData: { data: image.data, mimeType: image.mimeType },
-            }, { 
-                text: "Describe this image for a text-to-image AI model." 
-            }]
-        };
-
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents,
-            config: {
-                systemInstruction: imagePromptingSystemInstruction,
-                temperature: 0.5,
-                responseMimeType: "application/json",
-                responseSchema: promptSchema,
-            },
-        });
-        
-        const candidate = validateApiResponse(response);
-        const text = candidate.content.parts[0]?.text;
-
-        if (!text) {
-            throw new Error('The AI model returned an empty text response.');
-        }
-
-        try {
-            return JSON.parse(text);
-        } catch (e) {
-            console.error("Failed to parse JSON response from AI:", text);
-            throw new Error(`The AI returned a response that was not in the expected format. The model said: "${text}"`);
-        }
-    } catch (error) {
-        handleApiError(error);
-    }
+    return callApiProxy('generatePrompt', { image });
 };
 
+
+/**
+ * Calls the backend to generate an image from a prompt (and optionally, a source image).
+ * @param prompt The text prompt for image generation.
+ * @param image An optional source image for image-to-image tasks.
+ * @returns A promise that resolves to the base64-encoded image data string.
+ */
 export const generateImage = async (prompt: string, image: { data: string; mimeType: string; } | null): Promise<string> => {
-    if (!ai) throw new ApiKeyError('API is not initialized. Please provide your Google AI API key.');
-    
-    try {
-        const parts: Part[] = [];
-        if (image) {
-            parts.push({
-                inlineData: { data: image.data, mimeType: image.mimeType },
-            });
-        }
-        parts.push({ text: prompt });
-        
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: { parts },
-            config: {
-                responseModalities: [Modality.IMAGE],
-            },
-        });
-
-        const candidate = validateApiResponse(response);
-        
-        for (const part of candidate.content.parts) {
-            if (part.inlineData?.data) {
-                return part.inlineData.data;
-            }
-        }
-        
-        const textExplanation = candidate.content.parts.find(p => p.text)?.text;
-        if (textExplanation) {
-             throw new Error(`The model did not return an image. It responded with: "${textExplanation}"`);
-        }
-
-        throw new Error('No image data was found in the API response. The response may have been blocked or empty.');
-    } catch (error) {
-        handleApiError(error);
-    }
+    return callApiProxy('generateImage', { prompt, image });
 };
