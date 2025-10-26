@@ -16,9 +16,9 @@ export const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({ onKeySubmit }) =
 
     return (
         <div className="text-center p-8 bg-slate-800 rounded-xl shadow-2xl border border-slate-700">
-            <h1 className="text-2xl font-bold text-yellow-400 mb-4">Enter API Key</h1>
+            <h1 className="text-2xl font-bold text-yellow-400 mb-4">Enter Your Gemini API Key</h1>
             <p className="text-slate-300 mb-6">
-                Please enter your Google Gemini API key to continue. Your key will be stored locally in your browser.
+                To use this application, you need a Google Gemini API key. Your key will be stored securely in your browser's local storage and will not be shared.
             </p>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <input
@@ -37,17 +37,31 @@ export const ApiKeySelector: React.FC<ApiKeySelectorProps> = ({ onKeySubmit }) =
                     Save and Continue
                 </button>
             </form>
-            <p className="text-sm text-slate-400 mt-6">
-                Don't have a key? Get one from{' '}
-                <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-yellow-400 font-semibold hover:underline"
-                >
-                    Google AI Studio
-                </a>.
-            </p>
+            <div className="mt-8 text-left border-t border-slate-700 pt-6">
+                <h2 className="text-lg font-semibold text-slate-200 mb-3">How to get your API Key</h2>
+                <ol className="list-decimal list-inside space-y-2 text-slate-400 text-sm">
+                    <li>
+                        Go to{' '}
+                        <a
+                            href="https://aistudio.google.com/app/apikey"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-yellow-400 font-semibold hover:underline"
+                        >
+                            Google AI Studio
+                        </a>.
+                    </li>
+                    <li>
+                        Click the <span className="font-semibold text-slate-300">"Get API key"</span> button.
+                    </li>
+                     <li>
+                        Click <span className="font-semibold text-slate-300">"Create API key"</span>. You may need to create a new project first.
+                    </li>
+                    <li>
+                        Copy the generated key and paste it into the field above.
+                    </li>
+                </ol>
+            </div>
         </div>
     );
 };

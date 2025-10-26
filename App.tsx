@@ -223,7 +223,7 @@ const App: React.FC = () => {
     return (
       <div className="bg-slate-900 min-h-screen">
           <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 h-full flex items-center justify-center">
-            <div className="max-w-md w-full">
+            <div className="max-w-lg w-full">
               {error && <ErrorBanner message={error} onDismiss={handleClearError} />}
               <ApiKeySelector onKeySubmit={handleKeySubmit} />
             </div>
