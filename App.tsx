@@ -18,6 +18,8 @@ import { PromptCard } from './components/PromptCard';
 import { DocumentIcon } from './components/icons/DocumentIcon';
 import { SparklesIcon } from './components/icons/SparklesIcon';
 import { BookIcon } from './components/icons/BookIcon';
+import { EmailAccess } from './components/EmailAccess';
+import { ALLOWED_EMAILS } from './utils/access';
 
 type Stage = 'INPUT' | 'VARIATIONS' | 'EDIT';
 
@@ -26,6 +28,7 @@ const CAMERA_FRAMING_OPTIONS = ['Full Shot', 'Medium Shot', 'Close-up', 'Extreme
 const LIGHTING_OPTIONS = ['Cinematic Lighting', 'Golden Hour', 'Studio Lighting', 'Backlit', 'None'];
 
 const API_KEY_STORAGE_KEY = 'gemini-api-key';
+const EMAIL_STORAGE_KEY = 'promptcraft-user-email';
 
 const VARIATION_TITLES = [
   { title: 'Descriptive', icon: <DocumentIcon className="w-5 h-5" /> },
@@ -51,6 +54,7 @@ const getLightingSuffix = (lighting: string): string => {
 
 const App: React.FC = () => {
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [authenticatedEmail, setAuthenticatedEmail] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
@@ -79,6 +83,13 @@ const App: React.FC = () => {
   }, []);
   
   useEffect(() => {
+    const storedEmail = localStorage.getItem(EMAIL_STORAGE_KEY);
+    if (storedEmail && ALLOWED_EMAILS.length > 0 && ALLOWED_EMAILS.includes(storedEmail)) {
+      setAuthenticatedEmail(storedEmail);
+    } else {
+      localStorage.removeItem(EMAIL_STORAGE_KEY);
+    }
+
     const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
     if (storedKey) {
       setApiKey(storedKey);
@@ -86,6 +97,22 @@ const App: React.FC = () => {
     setIsInitializing(false);
     setHistory(getHistory());
   }, []);
+
+  const handleEmailSubmit = (email: string) => {
+    setAuthenticatedEmail(email);
+    localStorage.setItem(EMAIL_STORAGE_KEY, email);
+    setError(null);
+  };
+
+  const handleSignOut = () => {
+    if (window.confirm('Are you sure you want to sign out? This will also clear your saved API key.')) {
+      setAuthenticatedEmail(null);
+      setApiKey(null);
+      localStorage.removeItem(EMAIL_STORAGE_KEY);
+      localStorage.removeItem(API_KEY_STORAGE_KEY);
+      handleStartOver();
+    }
+  };
 
   const handleKeySubmit = (key: string) => {
     setApiKey(key);
@@ -294,9 +321,18 @@ const App: React.FC = () => {
     );
   }
 
+  if (!authenticatedEmail) {
+    return <EmailAccess onEmailSubmit={handleEmailSubmit} />;
+  }
+
   if (!apiKey) {
     return (
       <div className="bg-gray-100 min-h-screen">
+        <Header 
+          onHistoryClick={() => {}} 
+          authenticatedEmail={authenticatedEmail} 
+          onSignOut={handleSignOut} 
+        />
           <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 h-full flex items-center justify-center">
             <div className="max-w-lg w-full">
               {error && <ErrorBanner message={error} onDismiss={handleClearError} />}
@@ -309,7 +345,11 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-gray-100 text-gray-800 min-h-screen font-sans flex flex-col">
-      <Header onHistoryClick={() => setIsHistoryOpen(true)} />
+      <Header 
+        onHistoryClick={() => setIsHistoryOpen(true)}
+        authenticatedEmail={authenticatedEmail}
+        onSignOut={handleSignOut} 
+      />
       
       <HistorySidebar 
         isOpen={isHistoryOpen} 
