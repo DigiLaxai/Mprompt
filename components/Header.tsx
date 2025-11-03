@@ -7,16 +7,16 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onHistoryClick }) => {
   return (
-    <header className="bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10 border-b border-slate-800">
+    <header className="bg-white/80 backdrop-blur-sm sticky top-0 z-10 border-b border-gray-200">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           <h1 className="text-2xl font-bold tracking-tighter">
-            <span className="text-yellow-400">Prompt</span>
-            <span className="text-slate-300">Craft Studio</span>
+            <span className="text-violet-500">Prompt</span>
+            <span className="text-gray-800">Craft Studio</span>
           </h1>
           <button
             onClick={onHistoryClick}
-            className="p-2 rounded-full text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+            className="p-2 rounded-full text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors"
             aria-label="View history"
           >
             <HistoryIcon className="w-6 h-6" />

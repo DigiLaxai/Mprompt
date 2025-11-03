@@ -19,16 +19,16 @@ export const PromptInput: React.FC<PromptInputProps> = ({ image, onImageChange, 
   };
   
   return (
-    <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
-      <h2 className="text-xl font-semibold mb-4 text-center text-slate-300">Start with an Image</h2>
+    <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+      <h2 className="text-xl font-semibold mb-4 text-center text-gray-700">Start with an Image</h2>
       
       {!image ? (
         <div 
           onClick={handleImageUploadClick}
-          className="relative block w-full border-2 border-dashed border-slate-600 rounded-lg p-12 text-center hover:border-yellow-500 cursor-pointer transition-colors"
+          className="relative block w-full border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-violet-500 cursor-pointer transition-colors"
         >
-          <ImageIcon className="mx-auto h-12 w-12 text-slate-500" />
-          <span className="mt-2 block text-sm font-semibold text-slate-400">
+          <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
+          <span className="mt-2 block text-sm font-semibold text-gray-500">
             Click to upload an image
           </span>
           <input 
@@ -60,7 +60,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({ image, onImageChange, 
           <button
             onClick={onCreatePrompt}
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-all duration-300"
+            className="w-full flex items-center justify-center gap-2 bg-violet-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-violet-600 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-all duration-300"
           >
             {isLoading ? (
               <>

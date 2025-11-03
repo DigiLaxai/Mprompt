@@ -288,7 +288,7 @@ const App: React.FC = () => {
 
   if (isInitializing) {
     return (
-      <div className="bg-slate-900 min-h-screen flex items-center justify-center">
+      <div className="bg-gray-100 min-h-screen flex items-center justify-center">
         <Spinner />
       </div>
     );
@@ -296,7 +296,7 @@ const App: React.FC = () => {
 
   if (!apiKey) {
     return (
-      <div className="bg-slate-900 min-h-screen">
+      <div className="bg-gray-100 min-h-screen">
           <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 h-full flex items-center justify-center">
             <div className="max-w-lg w-full">
               {error && <ErrorBanner message={error} onDismiss={handleClearError} />}
@@ -308,7 +308,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="bg-slate-900 text-white min-h-screen font-sans flex flex-col">
+    <div className="bg-gray-100 text-gray-800 min-h-screen font-sans flex flex-col">
       <Header onHistoryClick={() => setIsHistoryOpen(true)} />
       
       <HistorySidebar 
@@ -347,19 +347,19 @@ const App: React.FC = () => {
           {stage === 'VARIATIONS' && uploadedImage && !isLoadingPrompt && (
             <div className="space-y-6 animate-fade-in">
               <div>
-                <h2 className="text-xl font-semibold mb-4 text-slate-300">1. Your Image</h2>
+                <h2 className="text-xl font-semibold mb-4 text-gray-600">1. Your Image</h2>
                   <div className="relative w-full max-w-xs mx-auto">
                   <img 
                       src={`data:${uploadedImage.mimeType};base64,${uploadedImage.data}`} 
                       alt="Uploaded content" 
-                      className="rounded-xl shadow-lg border-2 border-slate-700 w-full"
+                      className="rounded-xl shadow-lg border-2 border-gray-200 w-full"
                   />
                   </div>
               </div>
-              <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                   <div className="flex justify-between items-center mb-4">
-                      <h2 className="text-xl font-semibold text-slate-300">2. Choose a Prompt Variation</h2>
-                      <button onClick={handleStartOver} className="text-sm text-yellow-400 hover:text-yellow-300 font-semibold">Start Over</button>
+                      <h2 className="text-xl font-semibold text-gray-700">2. Choose a Prompt Variation</h2>
+                      <button onClick={handleStartOver} className="text-sm text-violet-500 hover:text-violet-600 font-semibold">Start Over</button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                       {promptVariations.map((prompt, index) => (
@@ -379,12 +379,12 @@ const App: React.FC = () => {
           {stage === 'EDIT' && uploadedImage && !isLoadingPrompt && (
             <div className="space-y-6 animate-fade-in">
               <div>
-                <h2 className="text-xl font-semibold mb-4 text-slate-300">1. Your Image</h2>
+                <h2 className="text-xl font-semibold mb-4 text-gray-600">1. Your Image</h2>
                 <div className="relative w-full max-w-sm mx-auto">
                   <img 
                     src={`data:${uploadedImage.mimeType};base64,${uploadedImage.data}`} 
                     alt="Uploaded content" 
-                    className="rounded-xl shadow-lg border-2 border-slate-700 w-full"
+                    className="rounded-xl shadow-lg border-2 border-gray-200 w-full"
                   />
                    <button 
                     onClick={handleStartOver}
@@ -396,8 +396,8 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
-                <label className="block text-lg font-semibold text-slate-300 mb-3">
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                <label className="block text-lg font-semibold text-gray-700 mb-3">
                   2. Choose an Artistic Style
                 </label>
                 <div className="flex flex-wrap gap-3">
@@ -407,8 +407,8 @@ const App: React.FC = () => {
                       onClick={() => handleStyleChange(style)}
                       className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
                         selectedStyle === style
-                          ? 'bg-yellow-500 text-slate-900 shadow-md'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          ? 'bg-violet-500 text-white shadow-md'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                       }`}
                     >
                       {style}
@@ -417,8 +417,8 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
-                <label className="block text-lg font-semibold text-slate-300 mb-3">
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                <label className="block text-lg font-semibold text-gray-700 mb-3">
                   3. Choose Camera Framing
                 </label>
                 <div className="flex flex-wrap gap-3">
@@ -428,8 +428,8 @@ const App: React.FC = () => {
                       onClick={() => handleFramingChange(framing)}
                       className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
                         selectedFraming === framing
-                          ? 'bg-yellow-500 text-slate-900 shadow-md'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          ? 'bg-violet-500 text-white shadow-md'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                       }`}
                     >
                       {framing}
@@ -438,8 +438,8 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
-                <label className="block text-lg font-semibold text-slate-300 mb-3">
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                <label className="block text-lg font-semibold text-gray-700 mb-3">
                   4. Choose Lighting
                 </label>
                 <div className="flex flex-wrap gap-3">
@@ -449,8 +449,8 @@ const App: React.FC = () => {
                       onClick={() => handleLightingChange(lighting)}
                       className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
                         selectedLighting === lighting
-                          ? 'bg-yellow-500 text-slate-900 shadow-md'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          ? 'bg-violet-500 text-white shadow-md'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                       }`}
                     >
                       {lighting}
@@ -459,14 +459,14 @@ const App: React.FC = () => {
                 </div>
               </div>
               
-              <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
-                <label htmlFor="prompt-editor" className="block text-lg font-semibold text-slate-300 mb-3">
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                <label htmlFor="prompt-editor" className="block text-lg font-semibold text-gray-700 mb-3">
                   5. Edit &amp; Generate
                 </label>
                 <textarea
                   id="prompt-editor"
                   rows={6}
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg p-4 text-slate-100 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-shadow resize-y"
+                  className="w-full bg-gray-50 border border-gray-300 rounded-lg p-4 text-gray-800 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-shadow resize-y"
                   value={editablePrompt}
                   onChange={(e) => setEditablePrompt(e.target.value)}
                   placeholder="Describe your vision..."
@@ -478,14 +478,14 @@ const App: React.FC = () => {
                   <button
                     onClick={handleCopy}
                     disabled={!editablePrompt.trim()}
-                    className="w-full flex items-center justify-center gap-2 bg-yellow-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-yellow-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-all duration-300 ease-in-out"
+                    className="w-full flex items-center justify-center gap-2 bg-violet-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-violet-600 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-all duration-300 ease-in-out"
                   >
                     {isCopied ? <><CheckIcon className="w-5 h-5" /> Copied!</> : <><CopyIcon className="w-5 h-5" /> Copy Prompt</>}
                   </button>
                   <button
                     onClick={handleGenerateImage}
                     disabled={!editablePrompt.trim() || isGeneratingImage}
-                    className="w-full flex items-center justify-center gap-2 bg-emerald-500 text-slate-900 font-bold py-3 px-4 rounded-lg hover:bg-emerald-400 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 transition-all duration-300 ease-in-out"
+                    className="w-full flex items-center justify-center gap-2 bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-all duration-300 ease-in-out"
                   >
                     {isGeneratingImage ? (
                       <><svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating...</>
