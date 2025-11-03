@@ -41,8 +41,8 @@ export const generateImageFromPrompt = async (prompt: string, originalImage: Ima
     if (!apiKey) throw new Error("API Key is not configured.");
     const ai = getAIClient(apiKey);
 
-    // Add a prefix to guide the model for better character consistency.
-    const finalPrompt = `Using the person from the provided reference image as the main subject, create a new image based on this description: "${prompt}"`;
+    // Enhanced prompt to guide the model for better quality, style, and face recognition.
+    const finalPrompt = `Your task is to create a new image based on the provided reference image and text description. It is crucial to maintain the exact facial features, likeness, and identity of the person from the reference image. The final image should be a masterpiece with a glossy finish, ultra-high detail, 4K resolution quality, featuring photorealistic skin and hair detail beautifully blended with stylized airbrush shading. Create an image based on this description: "${prompt}"`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
