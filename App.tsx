@@ -100,7 +100,17 @@ const App: React.FC = () => {
       reader.onloadend = () => {
         const base64String = (reader.result as string).split(',')[1];
         setUploadedImage({ data: base64String, mimeType: file.type });
-        handleStartOver();
+        
+        // Reset the state for a new image without clearing the image itself
+        setBasePrompt('');
+        setEditablePrompt('');
+        setSelectedStyle(ART_STYLES[0]);
+        setSelectedFraming(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
+        setSelectedLighting(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
+        setStage('INPUT');
+        setGeneratedImage(null);
+        setError(null);
+        setPromptVariations([]);
       };
       reader.readAsDataURL(file);
     }
