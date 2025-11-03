@@ -1,8 +1,11 @@
+
 export interface HistoryItem {
     id: number;
     uploadedImage: { data: string; mimeType: string; } | null;
     basePrompt: string;
     selectedStyle: string;
+    selectedFraming: string;
+    selectedLighting: string;
     generatedImage?: { data: string; mimeType: string; } | null;
 }
 

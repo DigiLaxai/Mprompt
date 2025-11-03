@@ -22,6 +22,9 @@ import { BookIcon } from './components/icons/BookIcon';
 type Stage = 'INPUT' | 'VARIATIONS' | 'EDIT';
 
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
+const CAMERA_FRAMING_OPTIONS = ['Full Shot', 'Medium Shot', 'Close-up', 'Extreme Close-up', 'None'];
+const LIGHTING_OPTIONS = ['Cinematic Lighting', 'Golden Hour', 'Studio Lighting', 'Backlit', 'None'];
+
 const API_KEY_STORAGE_KEY = 'gemini-api-key';
 
 const VARIATION_TITLES = [
@@ -32,10 +35,18 @@ const VARIATION_TITLES = [
 
 
 const getStyleSuffix = (style: string): string => {
-  if (!style || style === 'None') {
-    return '';
-  }
+  if (!style || style === 'None') return '';
   return `, in the style of ${style.toLowerCase()}`;
+};
+
+const getFramingSuffix = (framing: string): string => {
+  if (!framing || framing === 'None') return '';
+  return `, ${framing.toLowerCase()}`;
+};
+
+const getLightingSuffix = (lighting: string): string => {
+  if (!lighting || lighting === 'None') return '';
+  return `, ${lighting.toLowerCase()}`;
 };
 
 const App: React.FC = () => {
@@ -49,7 +60,9 @@ const App: React.FC = () => {
   const [basePrompt, setBasePrompt] = useState('');
   const [editablePrompt, setEditablePrompt] = useState('');
   const [selectedStyle, setSelectedStyle] = useState(ART_STYLES[0]);
-  
+  const [selectedFraming, setSelectedFraming] = useState(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
+  const [selectedLighting, setSelectedLighting] = useState(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
+
   const [isLoadingPrompt, setIsLoadingPrompt] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<{ data: string; mimeType: string; } | null>(null);
@@ -60,7 +73,11 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-
+  
+  const updateEditablePrompt = useCallback((base: string, style: string, framing: string, lighting: string) => {
+    setEditablePrompt(base + getStyleSuffix(style) + getFramingSuffix(framing) + getLightingSuffix(lighting));
+  }, []);
+  
   useEffect(() => {
     const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
     if (storedKey) {
@@ -83,23 +100,14 @@ const App: React.FC = () => {
       reader.onloadend = () => {
         const base64String = (reader.result as string).split(',')[1];
         setUploadedImage({ data: base64String, mimeType: file.type });
-        setStage('INPUT');
-        setEditablePrompt('');
-        setBasePrompt('');
-        setGeneratedImage(null);
-        setError(null);
+        handleStartOver();
       };
       reader.readAsDataURL(file);
     }
   };
 
   const handleImageRemove = () => {
-    setUploadedImage(null);
-    setEditablePrompt('');
-    setBasePrompt('');
-    setStage('INPUT');
-    setGeneratedImage(null);
-    setError(null);
+    handleStartOver();
   };
   
   const handleCreatePrompt = useCallback(async () => {
@@ -132,10 +140,14 @@ const App: React.FC = () => {
 
   const handleSelectVariation = useCallback((selectedPrompt: string) => {
     const defaultStyle = ART_STYLES[0];
+    const defaultFraming = CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1];
+    const defaultLighting = LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1];
     
     setBasePrompt(selectedPrompt);
     setSelectedStyle(defaultStyle);
-    setEditablePrompt(selectedPrompt + getStyleSuffix(defaultStyle));
+    setSelectedFraming(defaultFraming);
+    setSelectedLighting(defaultLighting);
+    updateEditablePrompt(selectedPrompt, defaultStyle, defaultFraming, defaultLighting);
     setStage('EDIT');
 
     const newHistoryItem: HistoryItem = {
@@ -143,26 +155,43 @@ const App: React.FC = () => {
       uploadedImage: uploadedImage!,
       basePrompt: selectedPrompt,
       selectedStyle: defaultStyle,
+      selectedFraming: defaultFraming,
+      selectedLighting: defaultLighting,
     };
     const updatedHistory = [newHistoryItem, ...history.slice(0, 19)];
     setHistory(updatedHistory);
     saveHistory(updatedHistory);
-  }, [uploadedImage, history]);
+  }, [uploadedImage, history, updateEditablePrompt]);
+
+  const updateHistoryWithOptions = useCallback((options: Partial<HistoryItem>) => {
+    const latestHistoryItem = history[0];
+    if (latestHistoryItem && latestHistoryItem.basePrompt === basePrompt) {
+        const updatedItem = { ...latestHistoryItem, ...options };
+        const updatedHistory = [updatedItem, ...history.slice(1)];
+        setHistory(updatedHistory);
+        saveHistory(updatedHistory);
+    }
+  }, [history, basePrompt]);
 
   const handleStyleChange = (newStyle: string) => {
     if (!basePrompt) return;
-
-    const newSuffix = getStyleSuffix(newStyle);
-    setEditablePrompt(basePrompt + newSuffix);
     setSelectedStyle(newStyle);
+    updateEditablePrompt(basePrompt, newStyle, selectedFraming, selectedLighting);
+    updateHistoryWithOptions({ selectedStyle: newStyle });
+  };
 
-    const latestHistoryItem = history[0];
-    if (latestHistoryItem && latestHistoryItem.basePrompt === basePrompt) {
-      const updatedItem = { ...latestHistoryItem, selectedStyle: newStyle };
-      const updatedHistory = [updatedItem, ...history.slice(1)];
-      setHistory(updatedHistory);
-      saveHistory(updatedHistory);
-    }
+  const handleFramingChange = (newFraming: string) => {
+    if (!basePrompt) return;
+    setSelectedFraming(newFraming);
+    updateEditablePrompt(basePrompt, selectedStyle, newFraming, selectedLighting);
+    updateHistoryWithOptions({ selectedFraming: newFraming });
+  };
+
+  const handleLightingChange = (newLighting: string) => {
+    if (!basePrompt) return;
+    setSelectedLighting(newLighting);
+    updateEditablePrompt(basePrompt, selectedStyle, selectedFraming, newLighting);
+    updateHistoryWithOptions({ selectedLighting: newLighting });
   };
 
   const handleStartOver = () => {
@@ -170,6 +199,8 @@ const App: React.FC = () => {
     setBasePrompt('');
     setEditablePrompt('');
     setSelectedStyle(ART_STYLES[0]);
+    setSelectedFraming(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
+    setSelectedLighting(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
     setStage('INPUT');
     setGeneratedImage(null);
     setError(null);
@@ -177,10 +208,15 @@ const App: React.FC = () => {
   };
 
   const loadFromHistory = (item: HistoryItem) => {
+    const framing = item.selectedFraming || CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1];
+    const lighting = item.selectedLighting || LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1];
+
     setUploadedImage(item.uploadedImage);
     setBasePrompt(item.basePrompt);
     setSelectedStyle(item.selectedStyle);
-    setEditablePrompt(item.basePrompt + getStyleSuffix(item.selectedStyle));
+    setSelectedFraming(framing);
+    setSelectedLighting(lighting);
+    updateEditablePrompt(item.basePrompt, item.selectedStyle, framing, lighting);
     setGeneratedImage(item.generatedImage || null);
     setStage('EDIT');
     setIsHistoryOpen(false);
@@ -370,10 +406,52 @@ const App: React.FC = () => {
                   ))}
                 </div>
               </div>
+
+              <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
+                <label className="block text-lg font-semibold text-slate-300 mb-3">
+                  3. Choose Camera Framing
+                </label>
+                <div className="flex flex-wrap gap-3">
+                  {CAMERA_FRAMING_OPTIONS.map(framing => (
+                    <button
+                      key={framing}
+                      onClick={() => handleFramingChange(framing)}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
+                        selectedFraming === framing
+                          ? 'bg-yellow-500 text-slate-900 shadow-md'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      {framing}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
+                <label className="block text-lg font-semibold text-slate-300 mb-3">
+                  4. Choose Lighting
+                </label>
+                <div className="flex flex-wrap gap-3">
+                  {LIGHTING_OPTIONS.map(lighting => (
+                    <button
+                      key={lighting}
+                      onClick={() => handleLightingChange(lighting)}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
+                        selectedLighting === lighting
+                          ? 'bg-yellow-500 text-slate-900 shadow-md'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      {lighting}
+                    </button>
+                  ))}
+                </div>
+              </div>
               
               <div className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700">
                 <label htmlFor="prompt-editor" className="block text-lg font-semibold text-slate-300 mb-3">
-                  3. Edit &amp; Generate
+                  5. Edit &amp; Generate
                 </label>
                 <textarea
                   id="prompt-editor"
