@@ -1,8 +1,8 @@
 
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 
-const getAIClient = (apiKey: string) => {
-    return new GoogleGenAI({ apiKey });
+const getAIClient = () => {
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 const variationsSystemInstruction = `You are an expert prompt writer for AI image generation models. Analyze the user's image and generate three distinct and creative prompt variations. Return these variations as a JSON array of strings.
@@ -16,9 +16,8 @@ interface Image {
     mimeType: string;
 }
 
-export const generatePromptVariationsFromImage = async (image: Image, apiKey: string): Promise<string[]> => {
-    if (!apiKey) throw new Error("API Key is not configured.");
-    const ai = getAIClient(apiKey);
+export const generatePromptVariationsFromImage = async (image: Image): Promise<string[]> => {
+    const ai = getAIClient();
     const contents = {
         parts: [{
             inlineData: {
@@ -63,9 +62,8 @@ export const generatePromptVariationsFromImage = async (image: Image, apiKey: st
     }
 }
 
-export const generateImageFromPrompt = async (prompt: string, originalImage: Image, apiKey: string): Promise<{ data: string; mimeType: string; }> => {
-    if (!apiKey) throw new Error("API Key is not configured.");
-    const ai = getAIClient(apiKey);
+export const generateImageFromPrompt = async (prompt: string, originalImage: Image): Promise<{ data: string; mimeType: string; }> => {
+    const ai = getAIClient();
 
     // Enhanced prompt to guide the model for better quality, style, and face recognition.
     const finalPrompt = `Your task is to create a new image based on the provided reference image and text description. It is crucial to maintain the exact facial features, likeness, and identity of the person from the reference image. The final image should be a masterpiece with a glossy finish, ultra-high detail, 4K resolution quality, featuring photorealistic skin and hair detail beautifully blended with stylized airbrush shading. Create an image based on this description: "${prompt}"`;

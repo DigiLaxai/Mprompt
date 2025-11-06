@@ -12,7 +12,6 @@ import { CopyIcon } from './components/icons/CopyIcon';
 import { CheckIcon } from './components/icons/CheckIcon';
 import { WandIcon } from './components/icons/WandIcon';
 import { GeneratedImageModal } from './components/GeneratedImageModal';
-import { ApiKeySelector } from './components/ApiKeySelector';
 import { XIcon } from './components/icons/XIcon';
 import { PromptCard } from './components/PromptCard';
 import { DocumentIcon } from './components/icons/DocumentIcon';
@@ -24,8 +23,6 @@ type Stage = 'INPUT' | 'VARIATIONS' | 'EDIT';
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
 const CAMERA_FRAMING_OPTIONS = ['Full Shot', 'Medium Shot', 'Close-up', 'Extreme Close-up', 'None'];
 const LIGHTING_OPTIONS = ['Cinematic Lighting', 'Golden Hour', 'Studio Lighting', 'Backlit', 'None'];
-
-const API_KEY_STORAGE_KEY = 'gemini-api-key';
 
 const VARIATION_TITLES = [
   { title: 'Descriptive', icon: <DocumentIcon className="w-5 h-5" /> },
@@ -50,9 +47,6 @@ const getLightingSuffix = (lighting: string): string => {
 };
 
 const App: React.FC = () => {
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [isInitializing, setIsInitializing] = useState(true);
-
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [stage, setStage] = useState<Stage>('INPUT');
   
@@ -79,19 +73,8 @@ const App: React.FC = () => {
   }, []);
   
   useEffect(() => {
-    const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-    if (storedKey) {
-      setApiKey(storedKey);
-    }
-    setIsInitializing(false);
     setHistory(getHistory());
   }, []);
-
-  const handleKeySubmit = (key: string) => {
-    setApiKey(key);
-    localStorage.setItem(API_KEY_STORAGE_KEY, key);
-    setError(null);
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -121,7 +104,7 @@ const App: React.FC = () => {
   };
   
   const handleCreatePrompt = useCallback(async () => {
-    if (!uploadedImage || !apiKey) return;
+    if (!uploadedImage) return;
 
     setIsLoadingPrompt(true);
     setError(null);
@@ -131,14 +114,12 @@ const App: React.FC = () => {
     setPromptVariations([]);
 
     try {
-      const variations = await generatePromptVariationsFromImage(uploadedImage, apiKey);
+      const variations = await generatePromptVariationsFromImage(uploadedImage);
       setPromptVariations(variations);
       setStage('VARIATIONS');
     } catch (err: any) {
       if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
-        setError('Your API key is invalid. Please enter a new one.');
-        localStorage.removeItem(API_KEY_STORAGE_KEY);
-        setApiKey(null);
+        setError('Your API key is invalid or missing. Please ensure it is configured correctly in the environment.');
       } else {
         setError(err.message || 'Failed to generate prompt from image.');
       }
@@ -146,7 +127,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoadingPrompt(false);
     }
-  }, [uploadedImage, apiKey]);
+  }, [uploadedImage]);
 
   const handleSelectVariation = useCallback((selectedPrompt: string) => {
     const defaultStyle = ART_STYLES[0];
@@ -249,7 +230,7 @@ const App: React.FC = () => {
   }, [editablePrompt]);
 
   const handleGenerateImage = useCallback(async () => {
-    if (!editablePrompt.trim() || !apiKey) return;
+    if (!editablePrompt.trim()) return;
 
     if (!uploadedImage) {
       setError('An uploaded image is required to generate a new image.');
@@ -259,7 +240,7 @@ const App: React.FC = () => {
     setIsGeneratingImage(true);
     setError(null);
     try {
-      const image = await generateImageFromPrompt(editablePrompt, uploadedImage, apiKey);
+      const image = await generateImageFromPrompt(editablePrompt, uploadedImage);
       setGeneratedImage(image);
       setIsModalOpen(true);
 
@@ -272,43 +253,17 @@ const App: React.FC = () => {
       }
     } catch (err: any) {
       if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
-        setError('Your API key is invalid. Please enter a new one.');
-        localStorage.removeItem(API_KEY_STORAGE_KEY);
-        setApiKey(null);
+        setError('Your API key is invalid or missing. Please ensure it is configured correctly in the environment.');
       } else {
         setError(err.message || 'Failed to generate image.');
       }
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [editablePrompt, history, basePrompt, apiKey, uploadedImage]);
+  }, [editablePrompt, history, basePrompt, uploadedImage]);
 
 
   const handleClearError = () => setError(null);
-
-  if (isInitializing) {
-    return (
-      <div className="bg-gray-100 min-h-screen flex items-center justify-center">
-        <Spinner />
-      </div>
-    );
-  }
-
-  if (!apiKey) {
-    return (
-      <div className="bg-gray-100 min-h-screen">
-        <Header 
-          onHistoryClick={() => {}} 
-        />
-          <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 h-full flex items-center justify-center">
-            <div className="max-w-lg w-full">
-              {error && <ErrorBanner message={error} onDismiss={handleClearError} />}
-              <ApiKeySelector onKeySubmit={handleKeySubmit} />
-            </div>
-          </main>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-gray-100 text-gray-800 min-h-screen font-sans flex flex-col">
