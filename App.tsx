@@ -5,7 +5,7 @@ import { PromptInput } from './components/PromptInput';
 import { Spinner } from './components/Spinner';
 import { Footer } from './components/Footer';
 import { HistorySidebar } from './components/HistorySidebar';
-import { generatePromptVariationsFromImage, generateImageFromPrompt } from './services/geminiService';
+import { generatePromptVariationsFromImage, generateImageFromPrompt, setGeminiApiKey } from './services/geminiService';
 import { ErrorBanner } from './components/ErrorBanner';
 import { HistoryItem, getHistory, saveHistory } from './utils/history';
 import { CopyIcon } from './components/icons/CopyIcon';
@@ -62,6 +62,9 @@ const getLightingSuffix = (lighting: string): string => {
 
 const App: React.FC = () => {
   const [apiKeyReady, setApiKeyReady] = useState(false);
+  const [isStudioEnv, setIsStudioEnv] = useState(false);
+  const [userApiKeyInput, setUserApiKeyInput] = useState('');
+
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [stage, setStage] = useState<Stage>('INPUT');
   
@@ -90,8 +93,26 @@ const App: React.FC = () => {
   useEffect(() => {
     setHistory(getHistory());
     const checkKey = async () => {
+        // 1. Check for injected key first
+        if (process.env.API_KEY) {
+            setApiKeyReady(true);
+            return;
+        }
+
+        // 2. Check for key from a previous session
+        const sessionKey = sessionStorage.getItem('user-api-key');
+        if (sessionKey) {
+            setGeminiApiKey(sessionKey);
+            setApiKeyReady(true);
+            return;
+        }
+
+        // 3. Check for AI Studio environment as a fallback
         if (window.aistudio) {
+            setIsStudioEnv(true);
             setApiKeyReady(await window.aistudio.hasSelectedApiKey());
+        } else {
+            setIsStudioEnv(false);
         }
     };
     checkKey();
@@ -104,6 +125,17 @@ const App: React.FC = () => {
         setApiKeyReady(true);
     } else {
         setError("API key management is not available in this environment.");
+    }
+  };
+
+  const handleUserKeySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (userApiKeyInput.trim()) {
+        setGeminiApiKey(userApiKeyInput.trim());
+        sessionStorage.setItem('user-api-key', userApiKeyInput.trim());
+        setApiKeyReady(true);
+    } else {
+        setError("Please enter a valid API key.");
     }
   };
 
@@ -133,6 +165,21 @@ const App: React.FC = () => {
   const handleImageRemove = () => {
     handleStartOver();
   };
+
+  const handleAuthError = (err: any) => {
+    const message = err.message || 'An unexpected error occurred.';
+    const isAuthError = message.includes('API key not valid') ||
+                        message.includes('API_KEY_INVALID') ||
+                        message.includes('Requested entity was not found');
+    
+    if (isAuthError) {
+      setError('Your API key seems to be invalid. Please provide a valid key.');
+      sessionStorage.removeItem('user-api-key'); // Clear the bad key
+      setApiKeyReady(false);
+    } else {
+      setError(message);
+    }
+  };
   
   const handleCreatePrompt = useCallback(async () => {
     if (!uploadedImage) return;
@@ -149,15 +196,7 @@ const App: React.FC = () => {
       setPromptVariations(variations);
       setStage('VARIATIONS');
     } catch (err: any) {
-      if (err.message?.includes('Requested entity was not found')) {
-        setError('Your API key seems to be invalid. Please select a new one.');
-        setApiKeyReady(false);
-      } else if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
-        setError('Your API key is invalid or missing. Please ensure it is configured correctly.');
-        setApiKeyReady(false);
-      } else {
-        setError(err.message || 'Failed to generate prompt from image.');
-      }
+      handleAuthError(err);
       setStage('INPUT');
     } finally {
       setIsLoadingPrompt(false);
@@ -287,15 +326,7 @@ const App: React.FC = () => {
         saveHistory(updatedHistory);
       }
     } catch (err: any) {
-      if (err.message?.includes('Requested entity was not found')) {
-        setError('Your API key seems to be invalid. Please select a new one.');
-        setApiKeyReady(false);
-      } else if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
-        setError('Your API key is invalid or missing. Please ensure it is configured correctly.');
-        setApiKeyReady(false);
-      } else {
-        setError(err.message || 'Failed to generate image.');
-      }
+      handleAuthError(err);
     } finally {
       setIsGeneratingImage(false);
     }
@@ -309,16 +340,45 @@ const App: React.FC = () => {
         <div className="bg-gray-100 min-h-screen flex items-center justify-center font-sans">
             <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md mx-4 animate-fade-in">
                 <h1 className="text-2xl font-bold text-gray-800 mb-4">API Key Required</h1>
-                <p className="text-gray-600 mb-6">
-                    This application requires a Google AI API key to function. Please select your key to continue.
-                </p>
-                {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-                <button
-                    onClick={handleSelectKey}
-                    className="w-full bg-violet-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-violet-600 transition-colors duration-300"
-                >
-                    Select Your API Key
-                </button>
+                
+                {isStudioEnv ? (
+                    <>
+                        <p className="text-gray-600 mb-6">
+                            This application requires a Google AI API key to function. Please select your key to continue.
+                        </p>
+                        <button
+                            onClick={handleSelectKey}
+                            className="w-full bg-violet-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-violet-600 transition-colors duration-300"
+                        >
+                            Select Your API Key
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <p className="text-gray-600 mb-6">
+                            Please enter your Google AI API key to continue. Your key is only stored for this session.
+                        </p>
+                        <form onSubmit={handleUserKeySubmit} className="space-y-4">
+                            <input
+                                type="password"
+                                value={userApiKeyInput}
+                                onChange={(e) => setUserApiKeyInput(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                                placeholder="Enter your API Key"
+                                aria-label="API Key Input"
+                            />
+                            <button
+                                type="submit"
+                                className="w-full bg-violet-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-violet-600 transition-colors duration-300"
+                            >
+                                Continue
+                            </button>
+                        </form>
+                    </>
+                )}
+
+                {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
+                
                 <a 
                   href="https://aistudio.google.com/app/apikey" 
                   target="_blank" 

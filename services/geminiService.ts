@@ -1,8 +1,26 @@
 
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 
+let customApiKey: string | null = null;
+
+/**
+ * Allows setting the API key dynamically from the application.
+ * @param key The Google AI API key.
+ */
+export const setGeminiApiKey = (key: string) => {
+    customApiKey = key;
+};
+
 const getAIClient = () => {
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Priority: 1. Custom key set from UI, 2. Environment variable.
+    const apiKey = customApiKey || process.env.API_KEY;
+
+    if (!apiKey) {
+        // This should not be hit if the UI logic is correct, but it's a good safeguard.
+        throw new Error("API key not found. Please set your API key.");
+    }
+    
+    return new GoogleGenAI({ apiKey });
 };
 
 const variationsSystemInstruction = `You are an expert prompt writer for AI image generation models. Analyze the user's image and generate three distinct and creative prompt variations. Return these variations as a JSON array of strings.
