@@ -18,6 +18,20 @@ import { DocumentIcon } from './components/icons/DocumentIcon';
 import { SparklesIcon } from './components/icons/SparklesIcon';
 import { BookIcon } from './components/icons/BookIcon';
 
+// FIX: Define AIStudio interface and use it for window.aistudio to resolve
+// conflicting global declarations. The error message indicates that
+// window.aistudio is expected to be of type AIStudio.
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+  interface Window {
+    // FIX: Made `aistudio` optional to resolve the declaration conflict. The property is checked for existence before use, indicating it may be undefined.
+    aistudio?: AIStudio;
+  }
+}
+
 type Stage = 'INPUT' | 'VARIATIONS' | 'EDIT';
 
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
@@ -47,6 +61,7 @@ const getLightingSuffix = (lighting: string): string => {
 };
 
 const App: React.FC = () => {
+  const [apiKeyReady, setApiKeyReady] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [stage, setStage] = useState<Stage>('INPUT');
   
@@ -74,7 +89,23 @@ const App: React.FC = () => {
   
   useEffect(() => {
     setHistory(getHistory());
+    const checkKey = async () => {
+        if (window.aistudio) {
+            setApiKeyReady(await window.aistudio.hasSelectedApiKey());
+        }
+    };
+    checkKey();
   }, []);
+  
+  const handleSelectKey = async () => {
+    setError(null);
+    if (window.aistudio) {
+        await window.aistudio.openSelectKey();
+        setApiKeyReady(true);
+    } else {
+        setError("API key management is not available in this environment.");
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -118,8 +149,12 @@ const App: React.FC = () => {
       setPromptVariations(variations);
       setStage('VARIATIONS');
     } catch (err: any) {
-      if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
-        setError('Your API key is invalid or missing. Please ensure it is configured correctly in the environment.');
+      if (err.message?.includes('Requested entity was not found')) {
+        setError('Your API key seems to be invalid. Please select a new one.');
+        setApiKeyReady(false);
+      } else if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
+        setError('Your API key is invalid or missing. Please ensure it is configured correctly.');
+        setApiKeyReady(false);
       } else {
         setError(err.message || 'Failed to generate prompt from image.');
       }
@@ -252,8 +287,12 @@ const App: React.FC = () => {
         saveHistory(updatedHistory);
       }
     } catch (err: any) {
-      if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
-        setError('Your API key is invalid or missing. Please ensure it is configured correctly in the environment.');
+      if (err.message?.includes('Requested entity was not found')) {
+        setError('Your API key seems to be invalid. Please select a new one.');
+        setApiKeyReady(false);
+      } else if (err.message?.includes('API key not valid') || err.message?.includes('API_KEY_INVALID')) {
+        setError('Your API key is invalid or missing. Please ensure it is configured correctly.');
+        setApiKeyReady(false);
       } else {
         setError(err.message || 'Failed to generate image.');
       }
@@ -264,6 +303,26 @@ const App: React.FC = () => {
 
 
   const handleClearError = () => setError(null);
+  
+  if (!apiKeyReady) {
+    return (
+        <div className="bg-gray-100 min-h-screen flex items-center justify-center font-sans">
+            <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md mx-4 animate-fade-in">
+                <h1 className="text-2xl font-bold text-gray-800 mb-4">API Key Required</h1>
+                <p className="text-gray-600 mb-6">
+                    This application requires a Google AI API key to function. Please select your key to continue. For information on billing, see the <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-violet-500 hover:underline">documentation</a>.
+                </p>
+                {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+                <button
+                    onClick={handleSelectKey}
+                    className="w-full bg-violet-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-violet-600 transition-colors duration-300"
+                >
+                    Select Your API Key
+                </button>
+            </div>
+        </div>
+    );
+  }
 
   return (
     <div className="bg-gray-100 text-gray-800 min-h-screen font-sans flex flex-col">

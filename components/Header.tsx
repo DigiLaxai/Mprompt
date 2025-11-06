@@ -12,8 +12,8 @@ export const Header: React.FC<HeaderProps> = ({ onHistoryClick }) => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           <h1 className="text-2xl font-bold tracking-tighter">
-            <span className="text-violet-500">Prompt</span>
-            <span className="text-gray-800">Craft Studio</span>
+            <span className="text-gray-800">Prompt Craft</span>
+            <span className="text-violet-500"> Studio</span>
           </h1>
           <div className="flex items-center gap-2 sm:gap-4">
             <button
