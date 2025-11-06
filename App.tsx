@@ -310,7 +310,7 @@ const App: React.FC = () => {
             <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md mx-4 animate-fade-in">
                 <h1 className="text-2xl font-bold text-gray-800 mb-4">API Key Required</h1>
                 <p className="text-gray-600 mb-6">
-                    This application requires a Google AI API key to function. Please select your key to continue. For information on billing, see the <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-violet-500 hover:underline">documentation</a>.
+                    This application requires a Google AI API key to function. Please select your key to continue.
                 </p>
                 {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
                 <button
@@ -319,6 +319,14 @@ const App: React.FC = () => {
                 >
                     Select Your API Key
                 </button>
+                <a 
+                  href="https://aistudio.google.com/app/apikey" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="mt-4 block text-sm text-gray-500 hover:text-violet-600 transition-colors"
+                >
+                  Don't have a key? Get one from Google AI Studio
+                </a>
             </div>
         </div>
     );

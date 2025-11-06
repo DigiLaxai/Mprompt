@@ -29,7 +29,7 @@ export const generatePromptVariationsFromImage = async (image: Image): Promise<s
     ]};
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
+        model: "gemini-2.5-flash",
         contents,
         config: {
             systemInstruction: variationsSystemInstruction,
