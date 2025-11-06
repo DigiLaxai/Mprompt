@@ -34,6 +34,32 @@ interface Image {
     mimeType: string;
 }
 
+export const generateCharacterDescription = async (image: Image): Promise<string> => {
+    const ai = getAIClient();
+    const systemInstruction = `Analyze the provided image and generate a detailed, neutral description of the main person or character. Focus on stable physical attributes like facial features (eye color, nose shape, face shape), hair color and style, and any unique, permanent identifiers like scars or tattoos. Avoid describing clothing, expression, or setting, as these are transient. The description should be concise and act as a 'character sheet' for an AI image generator to recreate the person consistently.`;
+    
+    const contents = {
+        parts: [{
+            inlineData: {
+                data: image.data,
+                mimeType: image.mimeType,
+            },
+        },
+        { text: "Describe the main character in this image, focusing on stable physical traits for consistent regeneration." }
+    ]};
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents,
+        config: {
+            systemInstruction,
+            temperature: 0.2,
+        },
+    });
+
+    return response.text.trim();
+}
+
 export const generatePromptVariationsFromImage = async (image: Image): Promise<string[]> => {
     const ai = getAIClient();
     const contents = {

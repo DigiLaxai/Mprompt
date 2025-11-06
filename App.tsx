@@ -5,7 +5,7 @@ import { PromptInput } from './components/PromptInput';
 import { Spinner } from './components/Spinner';
 import { Footer } from './components/Footer';
 import { HistorySidebar } from './components/HistorySidebar';
-import { generatePromptVariationsFromImage, generateImageFromPrompt, setGeminiApiKey } from './services/geminiService';
+import { generatePromptVariationsFromImage, generateImageFromPrompt, setGeminiApiKey, generateCharacterDescription } from './services/geminiService';
 import { ErrorBanner } from './components/ErrorBanner';
 import { HistoryItem, getHistory, saveHistory } from './utils/history';
 import { CopyIcon } from './components/icons/CopyIcon';
@@ -17,6 +17,8 @@ import { PromptCard } from './components/PromptCard';
 import { DocumentIcon } from './components/icons/DocumentIcon';
 import { SparklesIcon } from './components/icons/SparklesIcon';
 import { BookIcon } from './components/icons/BookIcon';
+import { Tooltip } from './components/Tooltip';
+import { UserFocusIcon } from './components/icons/UserFocusIcon';
 
 // FIX: Define AIStudio interface and use it for window.aistudio to resolve
 // conflicting global declarations. The error message indicates that
@@ -69,13 +71,15 @@ const App: React.FC = () => {
   const [stage, setStage] = useState<Stage>('INPUT');
   
   const [promptVariations, setPromptVariations] = useState<string[]>([]);
+  const [characterDescription, setCharacterDescription] = useState('');
   const [basePrompt, setBasePrompt] = useState('');
-  const [editablePrompt, setEditablePrompt] = useState('');
+  const [finalPrompt, setFinalPrompt] = useState('');
   const [selectedStyle, setSelectedStyle] = useState(ART_STYLES[0]);
   const [selectedFraming, setSelectedFraming] = useState(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
   const [selectedLighting, setSelectedLighting] = useState(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
 
   const [isLoadingPrompt, setIsLoadingPrompt] = useState(false);
+  const [isLoadingDescription, setIsLoadingDescription] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -86,9 +90,10 @@ const App: React.FC = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   
-  const updateEditablePrompt = useCallback((base: string, style: string, framing: string, lighting: string) => {
-    setEditablePrompt(base + getStyleSuffix(style) + getFramingSuffix(framing) + getLightingSuffix(lighting));
-  }, []);
+  useEffect(() => {
+    const fullBase = characterDescription ? `${characterDescription}. ${basePrompt}` : basePrompt;
+    setFinalPrompt(fullBase + getStyleSuffix(selectedStyle) + getFramingSuffix(selectedFraming) + getLightingSuffix(selectedLighting));
+  }, [basePrompt, characterDescription, selectedStyle, selectedFraming, selectedLighting]);
   
   useEffect(() => {
     setHistory(getHistory());
@@ -146,17 +151,7 @@ const App: React.FC = () => {
       reader.onloadend = () => {
         const base64String = (reader.result as string).split(',')[1];
         setUploadedImage({ data: base64String, mimeType: file.type });
-        
-        // Reset the state for a new image without clearing the image itself
-        setBasePrompt('');
-        setEditablePrompt('');
-        setSelectedStyle(ART_STYLES[0]);
-        setSelectedFraming(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
-        setSelectedLighting(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
-        setStage('INPUT');
-        setGeneratedImage(null);
-        setError(null);
-        setPromptVariations([]);
+        handleStartOver(true);
       };
       reader.readAsDataURL(file);
     }
@@ -187,9 +182,9 @@ const App: React.FC = () => {
     setIsLoadingPrompt(true);
     setError(null);
     setGeneratedImage(null);
-    setEditablePrompt('');
     setBasePrompt('');
     setPromptVariations([]);
+    setCharacterDescription('');
 
     try {
       const variations = await generatePromptVariationsFromImage(uploadedImage);
@@ -203,66 +198,79 @@ const App: React.FC = () => {
     }
   }, [uploadedImage]);
 
-  const handleSelectVariation = useCallback((selectedPrompt: string) => {
-    const defaultStyle = ART_STYLES[0];
-    const defaultFraming = CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1];
-    const defaultLighting = LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1];
-    
-    setBasePrompt(selectedPrompt);
-    setSelectedStyle(defaultStyle);
-    setSelectedFraming(defaultFraming);
-    setSelectedLighting(defaultLighting);
-    updateEditablePrompt(selectedPrompt, defaultStyle, defaultFraming, defaultLighting);
+  const handleSelectVariation = useCallback(async (selectedPrompt: string) => {
+    if (!uploadedImage) return;
+
+    setIsLoadingDescription(true);
+    setError(null);
     setStage('EDIT');
 
-    const newHistoryItem: HistoryItem = {
-      id: Date.now(),
-      uploadedImage: uploadedImage!,
-      basePrompt: selectedPrompt,
-      selectedStyle: defaultStyle,
-      selectedFraming: defaultFraming,
-      selectedLighting: defaultLighting,
-    };
-    const updatedHistory = [newHistoryItem, ...history.slice(0, 19)];
-    setHistory(updatedHistory);
-    saveHistory(updatedHistory);
-  }, [uploadedImage, history, updateEditablePrompt]);
+    try {
+        const description = await generateCharacterDescription(uploadedImage);
+        setCharacterDescription(description);
+
+        const defaultStyle = ART_STYLES[0];
+        const defaultFraming = CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1];
+        const defaultLighting = LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1];
+        
+        setBasePrompt(selectedPrompt);
+        setSelectedStyle(defaultStyle);
+        setSelectedFraming(defaultFraming);
+        setSelectedLighting(defaultLighting);
+
+        const newHistoryItem: HistoryItem = {
+          id: Date.now(),
+          uploadedImage: uploadedImage!,
+          basePrompt: selectedPrompt,
+          characterDescription: description,
+          selectedStyle: defaultStyle,
+          selectedFraming: defaultFraming,
+          selectedLighting: defaultLighting,
+        };
+        const updatedHistory = [newHistoryItem, ...history.slice(0, 19)];
+        setHistory(updatedHistory);
+        saveHistory(updatedHistory);
+
+    } catch (err: any) {
+        handleAuthError(err);
+        setStage('VARIATIONS');
+    } finally {
+        setIsLoadingDescription(false);
+    }
+  }, [uploadedImage, history]);
 
   const updateHistoryWithOptions = useCallback((options: Partial<HistoryItem>) => {
     const latestHistoryItem = history[0];
-    if (latestHistoryItem && latestHistoryItem.basePrompt === basePrompt) {
+    if (latestHistoryItem && latestHistoryItem.uploadedImage?.data === uploadedImage?.data) {
         const updatedItem = { ...latestHistoryItem, ...options };
         const updatedHistory = [updatedItem, ...history.slice(1)];
         setHistory(updatedHistory);
         saveHistory(updatedHistory);
     }
-  }, [history, basePrompt]);
+  }, [history, uploadedImage]);
 
   const handleStyleChange = (newStyle: string) => {
-    if (!basePrompt) return;
     setSelectedStyle(newStyle);
-    updateEditablePrompt(basePrompt, newStyle, selectedFraming, selectedLighting);
-    updateHistoryWithOptions({ selectedStyle: newStyle });
+    updateHistoryWithOptions({ selectedStyle: newStyle, basePrompt });
   };
 
   const handleFramingChange = (newFraming: string) => {
-    if (!basePrompt) return;
     setSelectedFraming(newFraming);
-    updateEditablePrompt(basePrompt, selectedStyle, newFraming, selectedLighting);
-    updateHistoryWithOptions({ selectedFraming: newFraming });
+    updateHistoryWithOptions({ selectedFraming: newFraming, basePrompt });
   };
 
   const handleLightingChange = (newLighting: string) => {
-    if (!basePrompt) return;
     setSelectedLighting(newLighting);
-    updateEditablePrompt(basePrompt, selectedStyle, selectedFraming, newLighting);
-    updateHistoryWithOptions({ selectedLighting: newLighting });
+    updateHistoryWithOptions({ selectedLighting: newLighting, basePrompt });
   };
 
-  const handleStartOver = () => {
-    setUploadedImage(null);
+  const handleStartOver = (keepImage = false) => {
+    if (!keepImage) {
+      setUploadedImage(null);
+    }
     setBasePrompt('');
-    setEditablePrompt('');
+    setFinalPrompt('');
+    setCharacterDescription('');
     setSelectedStyle(ART_STYLES[0]);
     setSelectedFraming(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
     setSelectedLighting(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
@@ -277,11 +285,11 @@ const App: React.FC = () => {
     const lighting = item.selectedLighting || LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1];
 
     setUploadedImage(item.uploadedImage);
+    setCharacterDescription(item.characterDescription || '');
     setBasePrompt(item.basePrompt);
     setSelectedStyle(item.selectedStyle);
     setSelectedFraming(framing);
     setSelectedLighting(lighting);
-    updateEditablePrompt(item.basePrompt, item.selectedStyle, framing, lighting);
     setGeneratedImage(item.generatedImage || null);
     setStage('EDIT');
     setIsHistoryOpen(false);
@@ -296,15 +304,15 @@ const App: React.FC = () => {
   };
 
   const handleCopy = useCallback(() => {
-    if (!editablePrompt) return;
-    navigator.clipboard.writeText(editablePrompt).then(() => {
+    if (!finalPrompt) return;
+    navigator.clipboard.writeText(finalPrompt).then(() => {
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
     });
-  }, [editablePrompt]);
+  }, [finalPrompt]);
 
   const handleGenerateImage = useCallback(async () => {
-    if (!editablePrompt.trim()) return;
+    if (!finalPrompt.trim()) return;
 
     if (!uploadedImage) {
       setError('An uploaded image is required to generate a new image.');
@@ -314,23 +322,16 @@ const App: React.FC = () => {
     setIsGeneratingImage(true);
     setError(null);
     try {
-      const image = await generateImageFromPrompt(editablePrompt, uploadedImage);
+      const image = await generateImageFromPrompt(finalPrompt, uploadedImage);
       setGeneratedImage(image);
       setIsModalOpen(true);
-
-      const latestHistoryItem = history[0];
-      if (latestHistoryItem && latestHistoryItem.basePrompt === basePrompt) {
-        const updatedItem = { ...latestHistoryItem, generatedImage: image };
-        const updatedHistory = [updatedItem, ...history.slice(1)];
-        setHistory(updatedHistory);
-        saveHistory(updatedHistory);
-      }
+      updateHistoryWithOptions({ generatedImage: image, basePrompt });
     } catch (err: any) {
       handleAuthError(err);
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [editablePrompt, history, basePrompt, uploadedImage]);
+  }, [finalPrompt, history, basePrompt, uploadedImage, updateHistoryWithOptions]);
 
 
   const handleClearError = () => setError(null);
@@ -410,7 +411,7 @@ const App: React.FC = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         imageData={generatedImage}
-        prompt={editablePrompt}
+        prompt={finalPrompt}
       />
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
@@ -446,7 +447,7 @@ const App: React.FC = () => {
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                   <div className="flex justify-between items-center mb-4">
                       <h2 className="text-xl font-semibold text-gray-700">2. Choose a Prompt Variation</h2>
-                      <button onClick={handleStartOver} className="text-sm text-violet-500 hover:text-violet-600 font-semibold">Start Over</button>
+                      <button onClick={()=>handleStartOver(true)} className="text-sm text-violet-500 hover:text-violet-600 font-semibold">Back</button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                       {promptVariations.map((prompt, index) => (
@@ -463,7 +464,14 @@ const App: React.FC = () => {
             </div>
           )}
           
-          {stage === 'EDIT' && uploadedImage && !isLoadingPrompt && (
+          {stage === 'EDIT' && uploadedImage && (
+            <>
+            {isLoadingDescription ? (
+               <div className="text-center p-8 bg-white rounded-xl shadow-lg">
+                 <Spinner />
+                 <p className="text-gray-600 mt-4 font-semibold animate-pulse">Creating character description for consistency...</p>
+               </div>
+            ) : (
             <div className="space-y-6 animate-fade-in">
               <div>
                 <h2 className="text-xl font-semibold mb-4 text-gray-600">1. Your Image</h2>
@@ -474,7 +482,7 @@ const App: React.FC = () => {
                     className="rounded-xl shadow-lg border-2 border-gray-200 w-full"
                   />
                    <button 
-                    onClick={handleStartOver}
+                    onClick={()=>handleStartOver()}
                     className="absolute -top-3 -right-3 bg-red-600 hover:bg-red-500 text-white rounded-full p-2 shadow-lg transition-transform transform hover:scale-110"
                     aria-label="Start over"
                   >
@@ -484,8 +492,21 @@ const App: React.FC = () => {
               </div>
 
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                <div className="flex items-center gap-3 mb-3">
+                  <UserFocusIcon className="w-6 h-6 text-violet-500" />
+                  <label className="block text-lg font-semibold text-gray-700">
+                    2. Character Consistency
+                  </label>
+                  <Tooltip text="This description is automatically generated and added to your prompt to help create consistent images of your character." />
+                </div>
+                <p className="text-sm text-gray-700 bg-gray-100 p-3 rounded-md border border-gray-200">
+                  {characterDescription}
+                </p>
+              </div>
+
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                 <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  2. Choose an Artistic Style
+                  3. Choose an Artistic Style
                 </label>
                 <div className="flex flex-wrap gap-3">
                   {ART_STYLES.map(style => (
@@ -506,7 +527,7 @@ const App: React.FC = () => {
 
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                 <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  3. Choose Camera Framing
+                  4. Choose Camera Framing
                 </label>
                 <div className="flex flex-wrap gap-3">
                   {CAMERA_FRAMING_OPTIONS.map(framing => (
@@ -527,7 +548,7 @@ const App: React.FC = () => {
 
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                 <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  4. Choose Lighting
+                  5. Choose Lighting
                 </label>
                 <div className="flex flex-wrap gap-3">
                   {LIGHTING_OPTIONS.map(lighting => (
@@ -548,14 +569,14 @@ const App: React.FC = () => {
               
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                 <label htmlFor="prompt-editor" className="block text-lg font-semibold text-gray-700 mb-3">
-                  5. Edit &amp; Generate
+                  6. Refine Prompt &amp; Generate
                 </label>
                 <textarea
                   id="prompt-editor"
-                  rows={6}
+                  rows={4}
                   className="w-full bg-gray-50 border border-gray-300 rounded-lg p-4 text-gray-800 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-shadow resize-y"
-                  value={editablePrompt}
-                  onChange={(e) => setEditablePrompt(e.target.value)}
+                  value={basePrompt}
+                  onChange={(e) => setBasePrompt(e.target.value)}
                   placeholder="Describe your vision..."
                 />
               </div>
@@ -564,14 +585,14 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <button
                     onClick={handleCopy}
-                    disabled={!editablePrompt.trim()}
+                    disabled={!finalPrompt.trim()}
                     className="w-full flex items-center justify-center gap-2 bg-violet-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-violet-600 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-all duration-300 ease-in-out"
                   >
-                    {isCopied ? <><CheckIcon className="w-5 h-5" /> Copied!</> : <><CopyIcon className="w-5 h-5" /> Copy Prompt</>}
+                    {isCopied ? <><CheckIcon className="w-5 h-5" /> Copied Full Prompt!</> : <><CopyIcon className="w-5 h-5" /> Copy Full Prompt</>}
                   </button>
                   <button
                     onClick={handleGenerateImage}
-                    disabled={!editablePrompt.trim() || isGeneratingImage}
+                    disabled={!finalPrompt.trim() || isGeneratingImage}
                     className="w-full flex items-center justify-center gap-2 bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-all duration-300 ease-in-out"
                   >
                     {isGeneratingImage ? (
@@ -583,6 +604,8 @@ const App: React.FC = () => {
                 </div>
               </div>
             </div>
+            )}
+            </>
           )}
         </div>
       </main>
