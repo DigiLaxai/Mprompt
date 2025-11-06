@@ -280,6 +280,18 @@ const App: React.FC = () => {
     setPromptVariations([]);
   };
 
+  const handleBackToVariations = () => {
+    setStage('VARIATIONS');
+    setBasePrompt('');
+    setFinalPrompt('');
+    setCharacterDescription('');
+    setSelectedStyle(ART_STYLES[0]);
+    setSelectedFraming(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
+    setSelectedLighting(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
+    setGeneratedImage(null);
+    setError(null);
+  };
+
   const loadFromHistory = (item: HistoryItem) => {
     const framing = item.selectedFraming || CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1];
     const lighting = item.selectedLighting || LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1];
@@ -474,7 +486,12 @@ const App: React.FC = () => {
             ) : (
             <div className="space-y-6 animate-fade-in">
               <div>
-                <h2 className="text-xl font-semibold mb-4 text-gray-600">1. Your Image</h2>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold text-gray-600">1. Your Image</h2>
+                  <button onClick={handleBackToVariations} className="text-sm text-violet-500 hover:text-violet-600 font-semibold">
+                    Choose Different Variation
+                  </button>
+                </div>
                 <div className="relative w-full max-w-sm mx-auto">
                   <img 
                     src={`data:${uploadedImage.mimeType};base64,${uploadedImage.data}`} 
