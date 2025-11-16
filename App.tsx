@@ -5,7 +5,7 @@ import { PromptInput } from './components/PromptInput';
 import { Spinner } from './components/Spinner';
 import { Footer } from './components/Footer';
 import { HistorySidebar } from './components/HistorySidebar';
-import { generatePromptVariationsFromImage, generateImageFromPrompt, setGeminiApiKey, generateCharacterDescription } from './services/geminiService';
+import { analyzeImageForPrompt, generateImageFromPrompt, setGeminiApiKey } from './services/geminiService';
 import { ErrorBanner } from './components/ErrorBanner';
 import { HistoryItem, getHistory, saveHistory } from './utils/history';
 import { CopyIcon } from './components/icons/CopyIcon';
@@ -13,10 +13,6 @@ import { CheckIcon } from './components/icons/CheckIcon';
 import { WandIcon } from './components/icons/WandIcon';
 import { GeneratedImageModal } from './components/GeneratedImageModal';
 import { XIcon } from './components/icons/XIcon';
-import { PromptCard } from './components/PromptCard';
-import { DocumentIcon } from './components/icons/DocumentIcon';
-import { SparklesIcon } from './components/icons/SparklesIcon';
-import { BookIcon } from './components/icons/BookIcon';
 import { Tooltip } from './components/Tooltip';
 import { UserFocusIcon } from './components/icons/UserFocusIcon';
 
@@ -34,18 +30,11 @@ declare global {
   }
 }
 
-type Stage = 'INPUT' | 'VARIATIONS' | 'EDIT';
+type Stage = 'INPUT' | 'EDIT';
 
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
 const CAMERA_FRAMING_OPTIONS = ['Full Shot', 'Medium Shot', 'Close-up', 'Extreme Close-up', 'None'];
 const LIGHTING_OPTIONS = ['Cinematic Lighting', 'Golden Hour', 'Studio Lighting', 'Backlit', 'None'];
-
-const VARIATION_TITLES = [
-  { title: 'Descriptive', icon: <DocumentIcon className="w-5 h-5" /> },
-  { title: 'Evocative', icon: <SparklesIcon className="w-5 h-5" /> },
-  { title: 'Narrative', icon: <BookIcon className="w-5 h-5" /> },
-];
-
 
 const getStyleSuffix = (style: string): string => {
   if (!style || style === 'None') return '';
@@ -70,16 +59,14 @@ const App: React.FC = () => {
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [stage, setStage] = useState<Stage>('INPUT');
   
-  const [promptVariations, setPromptVariations] = useState<string[]>([]);
   const [characterDescription, setCharacterDescription] = useState('');
-  const [basePrompt, setBasePrompt] = useState('');
+  const [basePrompt, setBasePrompt] = useState(''); // This now holds the scene description
   const [finalPrompt, setFinalPrompt] = useState('');
   const [selectedStyle, setSelectedStyle] = useState(ART_STYLES[0]);
   const [selectedFraming, setSelectedFraming] = useState(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
   const [selectedLighting, setSelectedLighting] = useState(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
 
-  const [isLoadingPrompt, setIsLoadingPrompt] = useState(false);
-  const [isLoadingDescription, setIsLoadingDescription] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<{ data: string; mimeType: string; } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -98,21 +85,16 @@ const App: React.FC = () => {
   useEffect(() => {
     setHistory(getHistory());
     const checkKey = async () => {
-        // 1. Check for injected key first
         if (process.env.API_KEY) {
             setApiKeyReady(true);
             return;
         }
-
-        // 2. Check for key from a previous session
         const sessionKey = sessionStorage.getItem('user-api-key');
         if (sessionKey) {
             setGeminiApiKey(sessionKey);
             setApiKeyReady(true);
             return;
         }
-
-        // 3. Check for AI Studio environment as a fallback
         if (window.aistudio) {
             setIsStudioEnv(true);
             setApiKeyReady(await window.aistudio.hasSelectedApiKey());
@@ -169,7 +151,7 @@ const App: React.FC = () => {
     
     if (isAuthError) {
       setError('Your API key seems to be invalid. Please provide a valid key.');
-      sessionStorage.removeItem('user-api-key'); // Clear the bad key
+      sessionStorage.removeItem('user-api-key');
       setApiKeyReady(false);
     } else {
       setError(message);
@@ -179,89 +161,89 @@ const App: React.FC = () => {
   const handleCreatePrompt = useCallback(async () => {
     if (!uploadedImage) return;
 
-    setIsLoadingPrompt(true);
+    setIsLoading(true);
     setError(null);
     setGeneratedImage(null);
     setBasePrompt('');
-    setPromptVariations([]);
     setCharacterDescription('');
 
     try {
-      const variations = await generatePromptVariationsFromImage(uploadedImage);
-      setPromptVariations(variations);
-      setStage('VARIATIONS');
+      const { characterDescription, sceneDescription } = await analyzeImageForPrompt(uploadedImage);
+      
+      setCharacterDescription(characterDescription);
+      setBasePrompt(sceneDescription);
+
+      const defaultStyle = ART_STYLES[0];
+      const defaultFraming = CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1];
+      const defaultLighting = LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1];
+        
+      setSelectedStyle(defaultStyle);
+      setSelectedFraming(defaultFraming);
+      setSelectedLighting(defaultLighting);
+        
+      setStage('EDIT');
+
+      const newHistoryItem: HistoryItem = {
+        id: Date.now(),
+        uploadedImage: uploadedImage!,
+        basePrompt: sceneDescription,
+        characterDescription: characterDescription,
+        selectedStyle: defaultStyle,
+        selectedFraming: defaultFraming,
+        selectedLighting: defaultLighting,
+      };
+      const updatedHistory = [newHistoryItem, ...history.slice(0, 19)];
+      setHistory(updatedHistory);
+      saveHistory(updatedHistory);
+
     } catch (err: any) {
       handleAuthError(err);
       setStage('INPUT');
     } finally {
-      setIsLoadingPrompt(false);
-    }
-  }, [uploadedImage]);
-
-  const handleSelectVariation = useCallback(async (selectedPrompt: string) => {
-    if (!uploadedImage) return;
-
-    setIsLoadingDescription(true);
-    setError(null);
-    setStage('EDIT');
-
-    try {
-        const description = await generateCharacterDescription(uploadedImage);
-        setCharacterDescription(description);
-
-        const defaultStyle = ART_STYLES[0];
-        const defaultFraming = CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1];
-        const defaultLighting = LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1];
-        
-        setBasePrompt(selectedPrompt);
-        setSelectedStyle(defaultStyle);
-        setSelectedFraming(defaultFraming);
-        setSelectedLighting(defaultLighting);
-
-        const newHistoryItem: HistoryItem = {
-          id: Date.now(),
-          uploadedImage: uploadedImage!,
-          basePrompt: selectedPrompt,
-          characterDescription: description,
-          selectedStyle: defaultStyle,
-          selectedFraming: defaultFraming,
-          selectedLighting: defaultLighting,
-        };
-        const updatedHistory = [newHistoryItem, ...history.slice(0, 19)];
-        setHistory(updatedHistory);
-        saveHistory(updatedHistory);
-
-    } catch (err: any) {
-        handleAuthError(err);
-        setStage('VARIATIONS');
-    } finally {
-        setIsLoadingDescription(false);
+      setIsLoading(false);
     }
   }, [uploadedImage, history]);
 
   const updateHistoryWithOptions = useCallback((options: Partial<HistoryItem>) => {
     const latestHistoryItem = history[0];
     if (latestHistoryItem && latestHistoryItem.uploadedImage?.data === uploadedImage?.data) {
-        const updatedItem = { ...latestHistoryItem, ...options };
+        const updatedItem = { 
+            ...latestHistoryItem, 
+            characterDescription,
+            basePrompt,
+            ...options 
+        };
         const updatedHistory = [updatedItem, ...history.slice(1)];
         setHistory(updatedHistory);
         saveHistory(updatedHistory);
     }
-  }, [history, uploadedImage]);
+  }, [history, uploadedImage, characterDescription, basePrompt]);
 
   const handleStyleChange = (newStyle: string) => {
     setSelectedStyle(newStyle);
-    updateHistoryWithOptions({ selectedStyle: newStyle, basePrompt });
+    updateHistoryWithOptions({ selectedStyle: newStyle });
   };
 
   const handleFramingChange = (newFraming: string) => {
     setSelectedFraming(newFraming);
-    updateHistoryWithOptions({ selectedFraming: newFraming, basePrompt });
+    updateHistoryWithOptions({ selectedFraming: newFraming });
   };
 
   const handleLightingChange = (newLighting: string) => {
     setSelectedLighting(newLighting);
-    updateHistoryWithOptions({ selectedLighting: newLighting, basePrompt });
+    updateHistoryWithOptions({ selectedLighting: newLighting });
+  };
+  
+  const handleCharacterDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const newDescription = e.target.value;
+      setCharacterDescription(newDescription);
+      updateHistoryWithOptions({ characterDescription: newDescription });
+  };
+  
+  const handleBasePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const newBasePrompt = e.target.value;
+      setBasePrompt(newBasePrompt);
+      updateHistoryWithOptions({ basePrompt: newBasePrompt });
   };
 
   const handleStartOver = (keepImage = false) => {
@@ -275,19 +257,6 @@ const App: React.FC = () => {
     setSelectedFraming(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
     setSelectedLighting(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
     setStage('INPUT');
-    setGeneratedImage(null);
-    setError(null);
-    setPromptVariations([]);
-  };
-
-  const handleBackToVariations = () => {
-    setStage('VARIATIONS');
-    setBasePrompt('');
-    setFinalPrompt('');
-    setCharacterDescription('');
-    setSelectedStyle(ART_STYLES[0]);
-    setSelectedFraming(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
-    setSelectedLighting(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
     setGeneratedImage(null);
     setError(null);
   };
@@ -337,14 +306,13 @@ const App: React.FC = () => {
       const image = await generateImageFromPrompt(finalPrompt, uploadedImage);
       setGeneratedImage(image);
       setIsModalOpen(true);
-      updateHistoryWithOptions({ generatedImage: image, basePrompt });
+      updateHistoryWithOptions({ generatedImage: image });
     } catch (err: any) {
       handleAuthError(err);
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [finalPrompt, history, basePrompt, uploadedImage, updateHistoryWithOptions]);
-
+  }, [finalPrompt, uploadedImage, updateHistoryWithOptions]);
 
   const handleClearError = () => setError(null);
   
@@ -433,63 +401,30 @@ const App: React.FC = () => {
           )}
           
           {stage === 'INPUT' && (
-            <PromptInput
-              image={uploadedImage}
-              onImageChange={handleImageChange}
-              onImageRemove={handleImageRemove}
-              onCreatePrompt={handleCreatePrompt}
-              isLoading={isLoadingPrompt}
-            />
-          )}
-
-          {isLoadingPrompt && <Spinner />}
-
-          {stage === 'VARIATIONS' && uploadedImage && !isLoadingPrompt && (
-            <div className="space-y-6 animate-fade-in">
-              <div>
-                <h2 className="text-xl font-semibold mb-4 text-gray-600">1. Your Image</h2>
-                  <div className="relative w-full max-w-xs mx-auto">
-                  <img 
-                      src={`data:${uploadedImage.mimeType};base64,${uploadedImage.data}`} 
-                      alt="Uploaded content" 
-                      className="rounded-xl shadow-lg border-2 border-gray-200 w-full"
-                  />
-                  </div>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                  <div className="flex justify-between items-center mb-4">
-                      <h2 className="text-xl font-semibold text-gray-700">2. Choose a Prompt Variation</h2>
-                      <button onClick={()=>handleStartOver(true)} className="text-sm text-violet-500 hover:text-violet-600 font-semibold">Back</button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-                      {promptVariations.map((prompt, index) => (
-                      <PromptCard 
-                          key={index}
-                          title={VARIATION_TITLES[index]?.title || `Variation ${index + 1}`}
-                          icon={VARIATION_TITLES[index]?.icon || <WandIcon className="w-5 h-5" />}
-                          prompt={prompt}
-                          onSelect={() => handleSelectVariation(prompt)}
-                      />
-                      ))}
-                  </div>
-              </div>
+            <div className="animate-fade-in">
+              <PromptInput
+                image={uploadedImage}
+                onImageChange={handleImageChange}
+                onImageRemove={handleImageRemove}
+                onCreatePrompt={handleCreatePrompt}
+                isLoading={isLoading}
+              />
+              {isLoading && (
+                 <div className="text-center p-8 bg-white rounded-xl shadow-lg mt-6">
+                   <Spinner />
+                   <p className="text-gray-600 mt-4 font-semibold animate-pulse">Analyzing image to build your prompt...</p>
+                 </div>
+              )}
             </div>
           )}
-          
+
           {stage === 'EDIT' && uploadedImage && (
-            <>
-            {isLoadingDescription ? (
-               <div className="text-center p-8 bg-white rounded-xl shadow-lg">
-                 <Spinner />
-                 <p className="text-gray-600 mt-4 font-semibold animate-pulse">Creating character description for consistency...</p>
-               </div>
-            ) : (
             <div className="space-y-6 animate-fade-in">
               <div>
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-semibold text-gray-600">1. Your Image</h2>
-                  <button onClick={handleBackToVariations} className="text-sm text-violet-500 hover:text-violet-600 font-semibold">
-                    Choose Different Variation
+                   <button onClick={() => handleStartOver(true)} className="text-sm text-violet-500 hover:text-violet-600 font-semibold">
+                    Reset Prompt
                   </button>
                 </div>
                 <div className="relative w-full max-w-sm mx-auto">
@@ -511,19 +446,38 @@ const App: React.FC = () => {
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                 <div className="flex items-center gap-3 mb-3">
                   <UserFocusIcon className="w-6 h-6 text-violet-500" />
-                  <label className="block text-lg font-semibold text-gray-700">
-                    2. Character Consistency
+                  <label htmlFor="character-description-editor" className="block text-lg font-semibold text-gray-700">
+                    2. Character Description
                   </label>
-                  <Tooltip text="This description is automatically generated and added to your prompt to help create consistent images of your character." />
+                  <Tooltip text="This description helps create consistent images of your character. Edit it to change their appearance." />
                 </div>
-                <p className="text-sm text-gray-700 bg-gray-100 p-3 rounded-md border border-gray-200">
-                  {characterDescription}
-                </p>
+                 <textarea
+                  id="character-description-editor"
+                  rows={3}
+                  className="w-full bg-gray-50 border border-gray-300 rounded-lg p-4 text-gray-800 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-shadow resize-y"
+                  value={characterDescription}
+                  onChange={handleCharacterDescriptionChange}
+                  placeholder="Describe the character..."
+                />
+              </div>
+              
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                <label htmlFor="prompt-editor" className="block text-lg font-semibold text-gray-700 mb-3">
+                  3. Scene & Action
+                </label>
+                <textarea
+                  id="prompt-editor"
+                  rows={4}
+                  className="w-full bg-gray-50 border border-gray-300 rounded-lg p-4 text-gray-800 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-shadow resize-y"
+                  value={basePrompt}
+                  onChange={handleBasePromptChange}
+                  placeholder="Describe the scene, setting, and what the character is doing..."
+                />
               </div>
 
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                 <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  3. Choose an Artistic Style
+                  4. Choose an Artistic Style
                 </label>
                 <div className="flex flex-wrap gap-3">
                   {ART_STYLES.map(style => (
@@ -544,7 +498,7 @@ const App: React.FC = () => {
 
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                 <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  4. Choose Camera Framing
+                  5. Choose Camera Framing
                 </label>
                 <div className="flex flex-wrap gap-3">
                   {CAMERA_FRAMING_OPTIONS.map(framing => (
@@ -565,7 +519,7 @@ const App: React.FC = () => {
 
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                 <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  5. Choose Lighting
+                  6. Choose Lighting
                 </label>
                 <div className="flex flex-wrap gap-3">
                   {LIGHTING_OPTIONS.map(lighting => (
@@ -584,33 +538,22 @@ const App: React.FC = () => {
                 </div>
               </div>
               
-              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                <label htmlFor="prompt-editor" className="block text-lg font-semibold text-gray-700 mb-3">
-                  6. Refine Prompt &amp; Generate
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 sticky bottom-4 z-5">
+                 <label className="block text-lg font-semibold text-gray-700 mb-3">
+                  7. Generate Your Image
                 </label>
-                <textarea
-                  id="prompt-editor"
-                  rows={4}
-                  className="w-full bg-gray-50 border border-gray-300 rounded-lg p-4 text-gray-800 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-shadow resize-y"
-                  value={basePrompt}
-                  onChange={(e) => setBasePrompt(e.target.value)}
-                  placeholder="Describe your vision..."
-                />
-              </div>
-
-              <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <button
                     onClick={handleCopy}
                     disabled={!finalPrompt.trim()}
-                    className="w-full flex items-center justify-center gap-2 bg-violet-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-violet-600 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-all duration-300 ease-in-out"
+                    className="w-full flex items-center justify-center gap-2 bg-gray-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-gray-600 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-all duration-300 ease-in-out"
                   >
                     {isCopied ? <><CheckIcon className="w-5 h-5" /> Copied Full Prompt!</> : <><CopyIcon className="w-5 h-5" /> Copy Full Prompt</>}
                   </button>
                   <button
                     onClick={handleGenerateImage}
                     disabled={!finalPrompt.trim() || isGeneratingImage}
-                    className="w-full flex items-center justify-center gap-2 bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-all duration-300 ease-in-out"
+                    className="w-full flex items-center justify-center gap-2 bg-violet-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-violet-600 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-all duration-300 ease-in-out"
                   >
                     {isGeneratingImage ? (
                       <><svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating...</>
@@ -619,10 +562,11 @@ const App: React.FC = () => {
                     )}
                   </button>
                 </div>
+                <div className="mt-4">
+                    <p className="text-xs text-gray-500 font-mono bg-gray-100 p-3 rounded-md border border-gray-200 break-words">{finalPrompt || 'Your final prompt will appear here.'}</p>
+                </div>
               </div>
             </div>
-            )}
-            </>
           )}
         </div>
       </main>

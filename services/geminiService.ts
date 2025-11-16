@@ -23,44 +23,24 @@ const getAIClient = () => {
     return new GoogleGenAI({ apiKey });
 };
 
-const variationsSystemInstruction = `You are an expert prompt writer for AI image generation models. Analyze the user's image and generate three distinct and creative prompt variations. Return these variations as a JSON array of strings.
-1.  **Descriptive:** A straightforward, detailed description of the image, focusing on subjects, setting, colors, and lighting.
-2.  **Evocative:** A more artistic and emotional prompt that captures the mood, feeling, or atmosphere of the image.
-3.  **Narrative:** A prompt that suggests a story or a moment in time, giving the characters or scene a backstory or future.
-Do not add any preamble, explanation, or markdown formatting. Only return the raw JSON array.`;
-
 interface Image {
     data: string;
     mimeType: string;
 }
 
-export const generateCharacterDescription = async (image: Image): Promise<string> => {
-    const ai = getAIClient();
-    const systemInstruction = `Analyze the provided image and generate a detailed, neutral description of the main person or character. Focus on stable physical attributes like facial features (eye color, nose shape, face shape), hair color and style, and any unique, permanent identifiers like scars or tattoos. Avoid describing clothing, expression, or setting, as these are transient. The description should be concise and act as a 'character sheet' for an AI image generator to recreate the person consistently.`;
-    
-    const contents = {
-        parts: [{
-            inlineData: {
-                data: image.data,
-                mimeType: image.mimeType,
-            },
-        },
-        { text: "Describe the main character in this image, focusing on stable physical traits for consistent regeneration." }
-    ]};
-
-    const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents,
-        config: {
-            systemInstruction,
-            temperature: 0.2,
-        },
-    });
-
-    return response.text.trim();
+interface AnalyzedPrompt {
+    characterDescription: string;
+    sceneDescription: string;
 }
 
-export const generatePromptVariationsFromImage = async (image: Image): Promise<string[]> => {
+const analysisSystemInstruction = `You are an expert image analyst for an AI image generation prompt builder. Analyze the user's image and break it down into two key components.
+1.  **characterDescription**: A detailed, neutral description of the main person or character. Focus on stable physical attributes like facial features (eye color, nose shape, face shape), hair color and style, and any unique, permanent identifiers like scars or tattoos. Avoid describing clothing, expression, or setting, as these are transient. The description should be concise and act as a 'character sheet' for an AI image generator to recreate the person consistently.
+2.  **sceneDescription**: A description of the character's action, the environment, background, and overall setting. Describe what the character is doing.
+
+Return the result as a single JSON object with keys "characterDescription" and "sceneDescription". Do not add any preamble, explanation, or markdown formatting. Only return the raw JSON object.`;
+
+
+export const analyzeImageForPrompt = async (image: Image): Promise<AnalyzedPrompt> => {
     const ai = getAIClient();
     const contents = {
         parts: [{
@@ -69,39 +49,36 @@ export const generatePromptVariationsFromImage = async (image: Image): Promise<s
                 mimeType: image.mimeType,
             },
         },
-        { text: "Generate three creative prompt variations for this image." }
+        { text: "Analyze this image and generate a character and scene description as a JSON object." }
     ]};
 
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents,
         config: {
-            systemInstruction: variationsSystemInstruction,
-            temperature: 0.7,
+            systemInstruction: analysisSystemInstruction,
+            temperature: 0.3,
             responseMimeType: "application/json",
             responseSchema: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.STRING
-                }
+                type: Type.OBJECT,
+                properties: {
+                    characterDescription: { type: Type.STRING },
+                    sceneDescription: { type: Type.STRING }
+                },
+                required: ["characterDescription", "sceneDescription"]
             }
         },
     });
 
     try {
         const jsonText = response.text.trim();
-        const variations = JSON.parse(jsonText);
-        if (Array.isArray(variations) && variations.every(v => typeof v === 'string') && variations.length > 0) {
-            return variations;
+        const result = JSON.parse(jsonText);
+        if (result.characterDescription && result.sceneDescription) {
+            return result;
         }
-         throw new Error("Invalid format for prompt variations.");
+        throw new Error("Invalid format for analyzed prompt components.");
     } catch (e) {
-        console.error("Failed to parse prompt variations JSON:", e);
-        // Fallback for unexpected non-JSON response
-        if (response.text) {
-             // Attempt to create a single prompt as a fallback
-            return [response.text.trim()];
-        }
+        console.error("Failed to parse analyzed prompt JSON:", e);
         throw new Error("Could not understand the response from the AI. Please try again.");
     }
 }
@@ -109,8 +86,7 @@ export const generatePromptVariationsFromImage = async (image: Image): Promise<s
 export const generateImageFromPrompt = async (prompt: string, originalImage: Image): Promise<{ data: string; mimeType: string; }> => {
     const ai = getAIClient();
 
-    // Enhanced prompt to guide the model for better quality, style, and face recognition.
-    const finalPrompt = `Your task is to create a new image based on the provided reference image and text description. It is crucial to maintain the exact facial features, likeness, and identity of the person from the reference image. The final image should be a masterpiece with a glossy finish, ultra-high detail, 4K resolution quality, featuring photorealistic skin and hair detail beautifully blended with stylized airbrush shading. Create an image based on this description: "${prompt}"`;
+    const finalPrompt = `Your task is to create a new image based on the provided reference image and text description. Use the reference image primarily to understand the character's base facial structure and identity, but strictly follow the text description for all details, including any modifications to appearance (like hair color), clothing, and scene. The final image should be a high-quality, detailed, and visually appealing artwork. Create an image based on this description: "${prompt}"`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
