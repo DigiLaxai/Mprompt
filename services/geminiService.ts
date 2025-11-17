@@ -35,7 +35,7 @@ interface AnalyzedPrompt {
 
 const analysisSystemInstruction = `You are an expert image analyst for an AI image generation prompt builder. Analyze the user's image and break it down into two key components.
 1.  **characterDescription**: A detailed, neutral description of the main person or character. Focus on stable physical attributes like facial features (eye color, nose shape, face shape), hair color and style, and any unique, permanent identifiers like scars or tattoos. Avoid describing clothing, expression, or setting, as these are transient. The description should be concise and act as a 'character sheet' for an AI image generator to recreate the person consistently.
-2.  **sceneDescription**: A description of the character's action, the environment, background, and overall setting. Describe what the character is doing.
+2.  **sceneDescription**: A description of the character's clothing, their action, the environment, background, and overall setting. Describe what the character is wearing and doing.
 
 Return the result as a single JSON object with keys "characterDescription" and "sceneDescription". Do not add any preamble, explanation, or markdown formatting. Only return the raw JSON object.`;
 
