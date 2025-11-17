@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { HistoryItem } from '../utils/history';
 import { CloseIcon } from './icons/CloseIcon';
@@ -40,9 +41,9 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ isOpen, onClose,
                   onClick={() => onLoad(item)}
                 >
                   <div className="w-16 h-16 flex-shrink-0 bg-gray-200 rounded-md flex items-center justify-center">
-                    {item.generatedImage ? (
+                    {item.generatedImages && item.generatedImages.length > 0 ? (
                        <img 
-                        src={`data:${item.generatedImage.mimeType};base64,${item.generatedImage.data}`}
+                        src={`data:${item.generatedImages[0].mimeType};base64,${item.generatedImages[0].data}`}
                         alt="Generated thumbnail"
                         className="w-full h-full object-cover rounded-md"
                       />

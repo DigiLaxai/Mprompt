@@ -83,36 +83,52 @@ export const analyzeImageForPrompt = async (image: Image): Promise<AnalyzedPromp
     }
 }
 
-export const generateImageFromPrompt = async (prompt: string, originalImage: Image): Promise<{ data: string; mimeType: string; }> => {
+export const generateImageFromPrompt = async (
+    prompt: string, 
+    originalImage: Image,
+    numberOfImages: number,
+): Promise<{ data: string; mimeType: string; }[]> => {
     const ai = getAIClient();
 
     const finalPrompt = `Your task is to create a new image based on the provided reference image and text description. Use the reference image primarily to understand the character's base facial structure and identity, but strictly follow the text description for all details, including any modifications to appearance (like hair color), clothing, and scene. The final image should be a high-quality, detailed, and visually appealing artwork. Create an image based on this description: "${prompt}"`;
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-            parts: [
-                {
-                    inlineData: {
-                        data: originalImage.data,
-                        mimeType: originalImage.mimeType,
+    const imagePromises = [];
+    for (let i = 0; i < numberOfImages; i++) {
+        imagePromises.push(ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: {
+                parts: [
+                    {
+                        inlineData: {
+                            data: originalImage.data,
+                            mimeType: originalImage.mimeType,
+                        },
                     },
-                },
-                { text: finalPrompt }
-            ],
-        },
-        config: {
-            responseModalities: [Modality.IMAGE],
-        },
-    });
-
-    const imagePart = response.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
-    if (imagePart && imagePart.inlineData) {
-        return {
-            data: imagePart.inlineData.data,
-            mimeType: imagePart.inlineData.mimeType,
-        };
+                    { text: finalPrompt }
+                ],
+            },
+            config: {
+                responseModalities: [Modality.IMAGE],
+            },
+        }));
     }
 
-    throw new Error('Image generation failed or no image was returned from the API.');
+    const responses = await Promise.all(imagePromises);
+
+    const images = responses.map(response => {
+        const imagePart = response.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
+        if (imagePart && imagePart.inlineData) {
+            return {
+                data: imagePart.inlineData.data,
+                mimeType: imagePart.inlineData.mimeType,
+            };
+        }
+        throw new Error('Image generation failed for one of the images.');
+    });
+
+    if (images.length !== numberOfImages) {
+      throw new Error('Image generation failed or not all images were returned from the API.');
+    }
+    
+    return images;
 }
