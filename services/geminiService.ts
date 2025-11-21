@@ -34,8 +34,8 @@ interface AnalyzedPrompt {
 }
 
 const analysisSystemInstruction = `You are an expert image analyst for an AI image generation prompt builder. Analyze the user's image and break it down into two key components.
-1.  **characterDescription**: A detailed, neutral description of the main person or character. Focus on stable physical attributes like facial features (eye color, nose shape, face shape), hair color and style, and any unique, permanent identifiers like scars or tattoos. Avoid describing clothing, expression, or setting, as these are transient. The description should be concise and act as a 'character sheet' for an AI image generator to recreate the person consistently.
-2.  **sceneDescription**: A description of the character's clothing, their action, the environment, background, and overall setting. Describe what the character is wearing and doing.
+1.  **characterDescription**: A detailed, neutral description of the main person or character. Focus ONLY on stable physical attributes: facial features (eye color, nose shape, face shape, skin tone), hair color and style, age, and body type. CRITICAL: Do NOT describe clothing, accessories, pose, expression, or background. This must describe ONLY the person's permanent identity.
+2.  **sceneDescription**: A comprehensive description of the character's current clothing, their action/pose, the environment, background, lighting, and overall setting.
 
 Return the result as a single JSON object with keys "characterDescription" and "sceneDescription". Do not add any preamble, explanation, or markdown formatting. Only return the raw JSON object.`;
 
@@ -90,7 +90,14 @@ export const generateImageFromPrompt = async (
 ): Promise<{ data: string; mimeType: string; }[]> => {
     const ai = getAIClient();
 
-    const finalPrompt = `Your task is to create a new image based on the provided reference image and text description. Use the reference image primarily to understand the character's base facial structure and identity, but strictly follow the text description for all details, including any modifications to appearance (like hair color), clothing, and scene. The final image should be a high-quality, detailed, and visually appealing artwork. Create an image based on this description: "${prompt}"`;
+    // Stronger instruction to override image context
+    const finalPrompt = `INSTRUCTIONS:
+1. REFERENCE IMAGE: Use the provided image ONLY as a reference for the character's facial features and physical identity. IGNORE the clothing, background, pose, and style in the reference image.
+2. TEXT PROMPT: "${prompt}"
+3. GOAL: Generate a new image of the character from the reference image, but strictly following the scene, clothing, action, and style described in the TEXT PROMPT. 
+   - If the text describes different clothes, the character MUST wear the new clothes.
+   - If the text describes a different setting, the background MUST change.
+   - The output must be a high-quality, detailed artwork matching the text description.`;
 
     const imagePromises = [];
     for (let i = 0; i < numberOfImages; i++) {

@@ -466,7 +466,7 @@ const App: React.FC = () => {
               
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                 <label htmlFor="prompt-editor" className="block text-lg font-semibold text-gray-700 mb-3">
-                  3. Scene & Action
+                  3. Scene, Clothing & Action
                 </label>
                 <textarea
                   id="prompt-editor"
@@ -474,7 +474,7 @@ const App: React.FC = () => {
                   className="w-full bg-gray-50 border border-gray-300 rounded-lg p-4 text-gray-800 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-shadow resize-y"
                   value={basePrompt}
                   onChange={handleBasePromptChange}
-                  placeholder="Describe the scene, setting, and what the character is doing..."
+                  placeholder="Describe the clothing, scene, setting, and what the character is doing..."
                 />
               </div>
 
