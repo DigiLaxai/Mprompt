@@ -541,7 +541,7 @@ const App: React.FC = () => {
                 </div>
               </div>
               
-              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 md:sticky bottom-4 z-5">
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                  <label className="block text-lg font-semibold text-gray-700 mb-3">
                   7. Generate Your Image
                 </label>
