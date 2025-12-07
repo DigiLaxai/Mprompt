@@ -33,11 +33,16 @@ interface AnalyzedPrompt {
     sceneDescription: string;
 }
 
-const analysisSystemInstruction = `You are an expert image analyst for an AI image generation prompt builder. Analyze the user's image and break it down into two key components.
-1.  **characterDescription**: A detailed, neutral description of the main person or character. Focus ONLY on stable physical attributes: facial features (eye color, nose shape, face shape, skin tone), hair color and style, age, and body type. CRITICAL: Do NOT describe clothing, accessories, pose, expression, or background. This must describe ONLY the person's permanent identity.
-2.  **sceneDescription**: A comprehensive description of the character's current clothing, their action/pose, the environment, background, lighting, and overall setting.
+const analysisSystemInstruction = `You are an expert image analyst. Your task is to extract a physical description of the person in the image, STRICTLY separating their permanent physical identity from their temporary context.
 
-Return the result as a single JSON object with keys "characterDescription" and "sceneDescription". Do not add any preamble, explanation, or markdown formatting. Only return the raw JSON object.`;
+1.  **characterDescription**: Describe ONLY the person's permanent physical traits: facial features, skin tone, eye color, hair color/texture, age, body shape, and ethnicity.
+    *   **CRITICAL NEGATIVE CONSTRAINT**: Do NOT describe their clothing, hat, glasses (unless prescription), pose, facial expression, background, or lighting.
+    *   Example: "A young woman with olive skin, almond-shaped brown eyes, and long wavy black hair."
+
+2.  **sceneDescription**: Describe the *current* context: clothing, accessories, pose, action, background, environment, lighting, and artistic style.
+    *   Example: "Wearing a red hoodie, standing in a crowded cyberpunk street, neon lighting, rain."
+
+Return the result as a raw JSON object with keys "characterDescription" and "sceneDescription".`;
 
 
 export const analyzeImageForPrompt = async (image: Image): Promise<AnalyzedPrompt> => {
@@ -49,7 +54,7 @@ export const analyzeImageForPrompt = async (image: Image): Promise<AnalyzedPromp
                 mimeType: image.mimeType,
             },
         },
-        { text: "Analyze this image and generate a character and scene description as a JSON object." }
+        { text: "Analyze this image and return the JSON object." }
     ]};
 
     const response = await ai.models.generateContent({
@@ -57,7 +62,7 @@ export const analyzeImageForPrompt = async (image: Image): Promise<AnalyzedPromp
         contents,
         config: {
             systemInstruction: analysisSystemInstruction,
-            temperature: 0.3,
+            temperature: 0.1, // Lower temperature for more factual extraction
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,
@@ -83,21 +88,41 @@ export const analyzeImageForPrompt = async (image: Image): Promise<AnalyzedPromp
     }
 }
 
+export interface PromptComponents {
+    character: string;
+    scene: string;
+    style: string;
+}
+
 export const generateImageFromPrompt = async (
-    prompt: string, 
+    components: PromptComponents,
     originalImage: Image,
     numberOfImages: number,
 ): Promise<{ data: string; mimeType: string; }[]> => {
     const ai = getAIClient();
 
-    // Stronger instruction to override image context
-    const finalPrompt = `INSTRUCTIONS:
-1. REFERENCE IMAGE: Use the provided image ONLY as a reference for the character's facial features and physical identity. IGNORE the clothing, background, pose, and style in the reference image.
-2. TEXT PROMPT: "${prompt}"
-3. GOAL: Generate a new image of the character from the reference image, but strictly following the scene, clothing, action, and style described in the TEXT PROMPT. 
-   - If the text describes different clothes, the character MUST wear the new clothes.
-   - If the text describes a different setting, the background MUST change.
-   - The output must be a high-quality, detailed artwork matching the text description.`;
+    // Construct a structured prompt that strictly separates identity (image) from context (text).
+    const finalPrompt = `
+    TASK: Generate a new image based on the provided REFERENCE IMAGE and the text descriptions below.
+
+    [1. REFERENCE IMAGE INSTRUCTIONS]
+    - **ROLE**: The reference image defines the **PERMANENT IDENTITY** (Face, Hair, Skin, Body Structure) of the character.
+    - **ACTION**: You MUST preserve the facial likeness and physical identity of the person in the reference image.
+    - **NEGATIVE CONSTRAINT**: IGNORE the clothing, background, pose, expression, and lighting of the reference image.
+
+    [2. NEW CONTENT SPECIFICATIONS]
+    - **SCENE, CLOTHING & ACTION**: "${components.scene}"
+      (This is the **ABSOLUTE AUTHORITY** for the character's outfit, pose, and environment. It OVERRIDES the reference image.)
+    
+    - **CHARACTER TRAITS**: "${components.character}"
+      (Use this to reinforce the identity features found in the reference image.)
+
+    - **ARTISTIC STYLE**: "${components.style}"
+
+    [3. GENERATION GOAL]
+    - Create a seamless integration of the *identity* from the Reference Image into the *scene/clothing* defined in the Text.
+    - If the text says "wearing a space suit", the character MUST be wearing a space suit, even if the reference image is wearing a t-shirt.
+    `;
 
     const imagePromises = [];
     for (let i = 0; i < numberOfImages; i++) {
@@ -116,6 +141,7 @@ export const generateImageFromPrompt = async (
             },
             config: {
                 responseModalities: [Modality.IMAGE],
+                // aspect ratio could be added here if we had a control for it, defaulting to 1:1 for now
             },
         }));
     }

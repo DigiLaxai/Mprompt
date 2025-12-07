@@ -306,7 +306,19 @@ const App: React.FC = () => {
     setIsGeneratingImage(true);
     setError(null);
     try {
-      const images = await generateImageFromPrompt(finalPrompt, uploadedImage, numberOfImages);
+      // Construct the style suffix
+      const styleSuffix = getStyleSuffix(selectedStyle) + getFramingSuffix(selectedFraming) + getLightingSuffix(selectedLighting);
+
+      // Pass components separately for better control in generation
+      const images = await generateImageFromPrompt(
+        {
+          character: characterDescription,
+          scene: basePrompt,
+          style: styleSuffix
+        },
+        uploadedImage, 
+        numberOfImages
+      );
       setGeneratedImages(images);
       setIsModalOpen(true);
       updateHistoryWithOptions({ generatedImages: images });
@@ -315,7 +327,7 @@ const App: React.FC = () => {
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [finalPrompt, uploadedImage, numberOfImages, updateHistoryWithOptions]);
+  }, [finalPrompt, uploadedImage, numberOfImages, characterDescription, basePrompt, selectedStyle, selectedFraming, selectedLighting, updateHistoryWithOptions]);
 
   const handleClearError = () => setError(null);
   
