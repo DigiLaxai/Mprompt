@@ -497,9 +497,9 @@ const App: React.FC = () => {
                             setSelectedStyle(e.target.value);
                             updateHistoryWithOptions({ selectedStyle: e.target.value });
                         }}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-violet-500"
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-violet-500 bg-white text-gray-900"
                     >
-                        {ART_STYLES.map(s => <option key={s} value={s}>{s}</option>)}
+                        {ART_STYLES.map(s => <option key={s} value={s} className="bg-white text-gray-900">{s}</option>)}
                     </select>
                 </div>
                 <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200">
@@ -510,9 +510,9 @@ const App: React.FC = () => {
                             setSelectedFraming(e.target.value);
                             updateHistoryWithOptions({ selectedFraming: e.target.value });
                         }}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-violet-500"
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-violet-500 bg-white text-gray-900"
                     >
-                        {CAMERA_FRAMING_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                        {CAMERA_FRAMING_OPTIONS.map(s => <option key={s} value={s} className="bg-white text-gray-900">{s}</option>)}
                     </select>
                 </div>
                 <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200">
@@ -523,9 +523,9 @@ const App: React.FC = () => {
                             setSelectedLighting(e.target.value);
                             updateHistoryWithOptions({ selectedLighting: e.target.value });
                         }}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-violet-500"
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-violet-500 bg-white text-gray-900"
                     >
-                        {LIGHTING_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                        {LIGHTING_OPTIONS.map(s => <option key={s} value={s} className="bg-white text-gray-900">{s}</option>)}
                     </select>
                 </div>
               </div>
