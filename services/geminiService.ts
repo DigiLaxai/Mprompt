@@ -16,7 +16,6 @@ const getAIClient = () => {
     const apiKey = customApiKey || process.env.API_KEY;
 
     if (!apiKey) {
-        // This should not be hit if the UI logic is correct, but it's a good safeguard.
         throw new Error("API key not found. Please set your API key.");
     }
     
@@ -33,17 +32,17 @@ interface AnalyzedPrompt {
     sceneDescription: string;
 }
 
+// System instruction for the Analysis step
 const analysisSystemInstruction = `You are an expert image analyst. Your task is to extract a physical description of the person in the image, STRICTLY separating their permanent physical identity from their temporary context.
 
 1.  **characterDescription**: Describe ONLY the person's permanent physical traits: facial features, skin tone, eye color, hair color/texture, age, body shape, and ethnicity.
-    *   **CRITICAL NEGATIVE CONSTRAINT**: Do NOT describe their clothing, hat, glasses (unless prescription), pose, facial expression, background, or lighting.
+    *   **CRITICAL**: Do NOT describe their clothing, hat, glasses (unless prescription), pose, facial expression, background, or lighting. Focus ONLY on the biological features.
     *   Example: "A young woman with olive skin, almond-shaped brown eyes, and long wavy black hair."
 
 2.  **sceneDescription**: Describe the *current* context: clothing, accessories, pose, action, background, environment, lighting, and artistic style.
     *   Example: "Wearing a red hoodie, standing in a crowded cyberpunk street, neon lighting, rain."
 
 Return the result as a raw JSON object with keys "characterDescription" and "sceneDescription".`;
-
 
 export const analyzeImageForPrompt = async (image: Image): Promise<AnalyzedPrompt> => {
     const ai = getAIClient();
@@ -62,7 +61,7 @@ export const analyzeImageForPrompt = async (image: Image): Promise<AnalyzedPromp
         contents,
         config: {
             systemInstruction: analysisSystemInstruction,
-            temperature: 0.1, // Lower temperature for more factual extraction
+            temperature: 0.1, 
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,
@@ -98,50 +97,83 @@ export const generateImageFromPrompt = async (
     components: PromptComponents,
     originalImage: Image,
     numberOfImages: number,
+    preserveFace: boolean,
 ): Promise<{ data: string; mimeType: string; }[]> => {
     const ai = getAIClient();
+    let contents;
 
-    // Construct a structured prompt that strictly separates identity (image) from context (text).
-    const finalPrompt = `
-    TASK: Generate a new image based on the provided REFERENCE IMAGE and the text descriptions below.
+    if (preserveFace) {
+        // We structure the prompt to explicitly tell the model that the IMAGE is for identity
+        // and the TEXT is for the scene/clothing.
+        const finalPrompt = `
+        You are a professional digital artist executing a "Costume and Set Change".
 
-    [1. REFERENCE IMAGE INSTRUCTIONS]
-    - **ROLE**: The reference image defines the **PERMANENT IDENTITY** (Face, Hair, Skin, Body Structure) of the character.
-    - **ACTION**: You MUST preserve the facial likeness and physical identity of the person in the reference image.
-    - **NEGATIVE CONSTRAINT**: IGNORE the clothing, background, pose, expression, and lighting of the reference image.
+        SOURCE MATERIAL:
+        1. Reference Image (Attached): Use this STRICTLY for the person's face, hair, and body type (Identity).
+        2. Instructions (Text Below): Use this STRICTLY for the clothing, background, and action (Context).
 
-    [2. NEW CONTENT SPECIFICATIONS]
-    - **SCENE, CLOTHING & ACTION**: "${components.scene}"
-      (This is the **ABSOLUTE AUTHORITY** for the character's outfit, pose, and environment. It OVERRIDES the reference image.)
-    
-    - **CHARACTER TRAITS**: "${components.character}"
-      (Use this to reinforce the identity features found in the reference image.)
+        TASK:
+        Generate a NEW image of the person from the Reference Image, but place them in the following context:
+        
+        [NEW SCENE & OUTFIT]
+        "${components.scene}"
 
-    - **ARTISTIC STYLE**: "${components.style}"
+        [CHARACTER IDENTITY]
+        (Maintain these traits from the image): "${components.character}"
 
-    [3. GENERATION GOAL]
-    - Create a seamless integration of the *identity* from the Reference Image into the *scene/clothing* defined in the Text.
-    - If the text says "wearing a space suit", the character MUST be wearing a space suit, even if the reference image is wearing a t-shirt.
-    `;
+        [ARTISTIC STYLE]
+        ${components.style}
+
+        CRITICAL RULES:
+        1. **IGNORE THE ORIGINAL CLOTHES**: If the reference image has a suit, but the text says "t-shirt", you MUST generate a t-shirt.
+        2. **IGNORE THE ORIGINAL BACKGROUND**: Do not reproduce the background from the reference image.
+        3. **PRIORITY**: The Text Description overrides the Reference Image for all non-facial details.
+        `;
+
+        contents = {
+            parts: [
+                // Image first establishes the subject
+                {
+                    inlineData: {
+                        data: originalImage.data,
+                        mimeType: originalImage.mimeType,
+                    },
+                },
+                // Text second provides the directive for transformation
+                { text: finalPrompt },
+            ],
+        };
+    } else {
+        // PURE TEXT GENERATION MODE
+        // We do not send the image, forcing the model to generate a new face based purely on the description.
+        const finalPrompt = `
+        You are a professional digital artist.
+
+        TASK:
+        Generate an image based on the following description:
+
+        [SCENE & OUTFIT]
+        "${components.scene}"
+
+        [CHARACTER DESCRIPTION]
+        "${components.character}"
+
+        [ARTISTIC STYLE]
+        ${components.style}
+        `;
+
+        contents = {
+            parts: [{ text: finalPrompt }],
+        };
+    }
 
     const imagePromises = [];
     for (let i = 0; i < numberOfImages; i++) {
         imagePromises.push(ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
-            contents: {
-                parts: [
-                    {
-                        inlineData: {
-                            data: originalImage.data,
-                            mimeType: originalImage.mimeType,
-                        },
-                    },
-                    { text: finalPrompt }
-                ],
-            },
+            contents: contents,
             config: {
                 responseModalities: [Modality.IMAGE],
-                // aspect ratio could be added here if we had a control for it, defaulting to 1:1 for now
             },
         }));
     }

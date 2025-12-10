@@ -8,6 +8,7 @@ export interface HistoryItem {
     selectedLighting: string;
     generatedImages?: { data: string; mimeType: string; }[] | null;
     characterDescription?: string;
+    preserveFace?: boolean;
 }
 
 const HISTORY_KEY = 'promptcraft-history';

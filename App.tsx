@@ -15,17 +15,15 @@ import { GeneratedImageModal } from './components/GeneratedImageModal';
 import { XIcon } from './components/icons/XIcon';
 import { Tooltip } from './components/Tooltip';
 import { UserFocusIcon } from './components/icons/UserFocusIcon';
+import { DocumentIcon } from './components/icons/DocumentIcon'; 
+import { SparklesIcon } from './components/icons/SparklesIcon';
 
-// FIX: Define AIStudio interface and use it for window.aistudio to resolve
-// conflicting global declarations. The error message indicates that
-// window.aistudio is expected to be of type AIStudio.
 declare global {
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
     openSelectKey: () => Promise<void>;
   }
   interface Window {
-    // FIX: Made `aistudio` optional to resolve the declaration conflict. The property is checked for existence before use, indicating it may be undefined.
     aistudio?: AIStudio;
   }
 }
@@ -61,11 +59,12 @@ const App: React.FC = () => {
   const [stage, setStage] = useState<Stage>('INPUT');
   
   const [characterDescription, setCharacterDescription] = useState('');
-  const [basePrompt, setBasePrompt] = useState(''); // This now holds the scene description
+  const [basePrompt, setBasePrompt] = useState(''); 
   const [finalPrompt, setFinalPrompt] = useState('');
   const [selectedStyle, setSelectedStyle] = useState(ART_STYLES[0]);
   const [selectedFraming, setSelectedFraming] = useState(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
   const [selectedLighting, setSelectedLighting] = useState(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
+  const [preserveFace, setPreserveFace] = useState(true);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -183,6 +182,7 @@ const App: React.FC = () => {
       setSelectedStyle(defaultStyle);
       setSelectedFraming(defaultFraming);
       setSelectedLighting(defaultLighting);
+      setPreserveFace(true);
         
       setStage('EDIT');
 
@@ -194,6 +194,7 @@ const App: React.FC = () => {
         selectedStyle: defaultStyle,
         selectedFraming: defaultFraming,
         selectedLighting: defaultLighting,
+        preserveFace: true,
       };
       const updatedHistory = [newHistoryItem, ...history.slice(0, 19)];
       setHistory(updatedHistory);
@@ -214,29 +215,15 @@ const App: React.FC = () => {
             ...latestHistoryItem, 
             characterDescription,
             basePrompt,
+            preserveFace,
             ...options 
         };
         const updatedHistory = [updatedItem, ...history.slice(1)];
         setHistory(updatedHistory);
         saveHistory(updatedHistory);
     }
-  }, [history, uploadedImage, characterDescription, basePrompt]);
+  }, [history, uploadedImage, characterDescription, basePrompt, preserveFace]);
 
-  const handleStyleChange = (newStyle: string) => {
-    setSelectedStyle(newStyle);
-    updateHistoryWithOptions({ selectedStyle: newStyle });
-  };
-
-  const handleFramingChange = (newFraming: string) => {
-    setSelectedFraming(newFraming);
-    updateHistoryWithOptions({ selectedFraming: newFraming });
-  };
-
-  const handleLightingChange = (newLighting: string) => {
-    setSelectedLighting(newLighting);
-    updateHistoryWithOptions({ selectedLighting: newLighting });
-  };
-  
   const handleCharacterDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newDescription = e.target.value;
       setCharacterDescription(newDescription);
@@ -259,6 +246,7 @@ const App: React.FC = () => {
     setSelectedStyle(ART_STYLES[0]);
     setSelectedFraming(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
     setSelectedLighting(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
+    setPreserveFace(true);
     setStage('INPUT');
     setGeneratedImages(null);
     setError(null);
@@ -274,6 +262,7 @@ const App: React.FC = () => {
     setSelectedStyle(item.selectedStyle);
     setSelectedFraming(framing);
     setSelectedLighting(lighting);
+    setPreserveFace(item.preserveFace ?? true);
     setGeneratedImages(item.generatedImages || null);
     setStage('EDIT');
     setIsHistoryOpen(false);
@@ -286,14 +275,6 @@ const App: React.FC = () => {
         saveHistory([]);
     }
   };
-
-  const handleCopy = useCallback(() => {
-    if (!finalPrompt) return;
-    navigator.clipboard.writeText(finalPrompt).then(() => {
-        setIsCopied(true);
-        setTimeout(() => setIsCopied(false), 2000);
-    });
-  }, [finalPrompt]);
 
   const handleGenerateImage = useCallback(async () => {
     if (!finalPrompt.trim()) return;
@@ -317,7 +298,8 @@ const App: React.FC = () => {
           style: styleSuffix
         },
         uploadedImage, 
-        numberOfImages
+        numberOfImages,
+        preserveFace
       );
       setGeneratedImages(images);
       setIsModalOpen(true);
@@ -327,7 +309,7 @@ const App: React.FC = () => {
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [finalPrompt, uploadedImage, numberOfImages, characterDescription, basePrompt, selectedStyle, selectedFraming, selectedLighting, updateHistoryWithOptions]);
+  }, [finalPrompt, uploadedImage, numberOfImages, characterDescription, basePrompt, selectedStyle, selectedFraming, selectedLighting, preserveFace, updateHistoryWithOptions]);
 
   const handleClearError = () => setError(null);
   
@@ -372,17 +354,6 @@ const App: React.FC = () => {
                         </form>
                     </>
                 )}
-
-                {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
-                
-                <a 
-                  href="https://aistudio.google.com/app/apikey" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="mt-4 block text-sm text-gray-500 hover:text-violet-600 transition-colors"
-                >
-                  Don't have a key? Get one from Google AI Studio
-                </a>
             </div>
         </div>
     );
@@ -390,9 +361,7 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-gray-100 text-gray-800 min-h-screen font-sans flex flex-col">
-      <Header 
-        onHistoryClick={() => setIsHistoryOpen(true)}
-      />
+      <Header onHistoryClick={() => setIsHistoryOpen(true)} />
       
       <HistorySidebar 
         isOpen={isHistoryOpen} 
@@ -409,7 +378,7 @@ const App: React.FC = () => {
         prompt={finalPrompt}
       />
 
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 flex-grow">
         <div className="max-w-3xl mx-auto">
           {error && (
             <ErrorBanner message={error} onDismiss={handleClearError} />
@@ -458,147 +427,126 @@ const App: React.FC = () => {
                 </div>
               </div>
 
+              {/* Character Identity Editor */}
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                <div className="flex items-center gap-3 mb-3">
-                  <UserFocusIcon className="w-6 h-6 text-violet-500" />
-                  <label htmlFor="character-description-editor" className="block text-lg font-semibold text-gray-700">
-                    2. Character Description
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-3">
+                    <UserFocusIcon className="w-6 h-6 text-violet-500" />
+                    <label htmlFor="character-description-editor" className="block text-lg font-semibold text-gray-700">
+                      2. Character Identity
+                    </label>
+                    <Tooltip text={preserveFace ? "We will use your original photo to keep the face consistent." : "We will generate a completely new face based on this description."} />
+                  </div>
+                  
+                  {/* Preserve Face Toggle */}
+                   <label className="flex items-center gap-2 cursor-pointer bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-200 transition-colors select-none">
+                      <div className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                              type="checkbox" 
+                              className="sr-only peer" 
+                              checked={preserveFace}
+                              onChange={(e) => {
+                                  const newValue = e.target.checked;
+                                  setPreserveFace(newValue);
+                                  updateHistoryWithOptions({ preserveFace: newValue });
+                              }}
+                          />
+                          <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-500"></div>
+                          <span className="ml-2 text-sm font-medium text-gray-700">Preserve Face</span>
+                      </div>
                   </label>
-                  <Tooltip text="This description helps create consistent images of your character. Edit it to change their appearance." />
                 </div>
                  <textarea
                   id="character-description-editor"
                   rows={3}
+                  maxLength={1000}
                   className="w-full bg-gray-50 border border-gray-300 rounded-lg p-4 text-gray-800 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-shadow resize-y"
                   value={characterDescription}
                   onChange={handleCharacterDescriptionChange}
-                  placeholder="Describe the character..."
+                  placeholder="Describe the character's physical traits..."
                 />
               </div>
-              
+
+              {/* Scene and Action Editor */}
               <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                <label htmlFor="prompt-editor" className="block text-lg font-semibold text-gray-700 mb-3">
-                  3. Scene, Clothing & Action
-                </label>
-                <textarea
-                  id="prompt-editor"
+                <div className="flex items-center gap-3 mb-3">
+                  <SparklesIcon className="w-6 h-6 text-violet-500" />
+                  <label htmlFor="scene-description-editor" className="block text-lg font-semibold text-gray-700">
+                    3. Scene, Clothing & Action
+                  </label>
+                  <Tooltip text="Describe the NEW outfit, background, and what the character is doing. The AI will prioritize this over the original image." />
+                </div>
+                 <textarea
+                  id="scene-description-editor"
                   rows={4}
+                  maxLength={2000}
                   className="w-full bg-gray-50 border border-gray-300 rounded-lg p-4 text-gray-800 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-shadow resize-y"
                   value={basePrompt}
                   onChange={handleBasePromptChange}
-                  placeholder="Describe the clothing, scene, setting, and what the character is doing..."
+                  placeholder="E.g., Wearing a futuristic space suit, standing on Mars, red dust everywhere..."
                 />
               </div>
 
-              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  4. Choose an Artistic Style
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {ART_STYLES.map(style => (
-                    <button
-                      key={style}
-                      onClick={() => handleStyleChange(style)}
-                      className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
-                        selectedStyle === style
-                          ? 'bg-violet-500 text-white shadow-md'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
+              {/* Style Controls */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Art Style</label>
+                    <select 
+                        value={selectedStyle} 
+                        onChange={(e) => {
+                            setSelectedStyle(e.target.value);
+                            updateHistoryWithOptions({ selectedStyle: e.target.value });
+                        }}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-violet-500"
                     >
-                      {style}
-                    </button>
-                  ))}
+                        {ART_STYLES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Framing</label>
+                    <select 
+                        value={selectedFraming} 
+                        onChange={(e) => {
+                            setSelectedFraming(e.target.value);
+                            updateHistoryWithOptions({ selectedFraming: e.target.value });
+                        }}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-violet-500"
+                    >
+                        {CAMERA_FRAMING_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Lighting</label>
+                    <select 
+                        value={selectedLighting} 
+                        onChange={(e) => {
+                            setSelectedLighting(e.target.value);
+                            updateHistoryWithOptions({ selectedLighting: e.target.value });
+                        }}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-violet-500"
+                    >
+                        {LIGHTING_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
                 </div>
               </div>
 
-              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  5. Choose Camera Framing
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {CAMERA_FRAMING_OPTIONS.map(framing => (
-                    <button
-                      key={framing}
-                      onClick={() => handleFramingChange(framing)}
-                      className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
-                        selectedFraming === framing
-                          ? 'bg-violet-500 text-white shadow-md'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      {framing}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  6. Choose Lighting
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {LIGHTING_OPTIONS.map(lighting => (
-                    <button
-                      key={lighting}
-                      onClick={() => handleLightingChange(lighting)}
-                      className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
-                        selectedLighting === lighting
-                          ? 'bg-violet-500 text-white shadow-md'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      {lighting}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                 <label className="block text-lg font-semibold text-gray-700 mb-3">
-                  7. Generate Your Image
-                </label>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-600 mb-2">Number of Images</label>
-                  <div className="flex items-center gap-2">
-                      {[1, 2, 3, 4].map(num => (
-                          <button
-                              key={num}
-                              onClick={() => setNumberOfImages(num)}
-                              className={`w-10 h-10 rounded-full text-sm font-semibold transition-colors duration-200 flex items-center justify-center ${
-                                  numberOfImages === num
-                                  ? 'bg-violet-500 text-white shadow-md'
-                                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                              }`}
-                          >
-                              {num}
-                          </button>
-                      ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <button
-                    onClick={handleCopy}
-                    disabled={!finalPrompt.trim()}
-                    className="w-full flex items-center justify-center gap-2 bg-gray-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-gray-600 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-all duration-300 ease-in-out"
-                  >
-                    {isCopied ? <><CheckIcon className="w-5 h-5" /> Copied Full Prompt!</> : <><CopyIcon className="w-5 h-5" /> Copy Full Prompt</>}
-                  </button>
-                  <button
-                    onClick={handleGenerateImage}
-                    disabled={!finalPrompt.trim() || isGeneratingImage}
-                    className="w-full flex items-center justify-center gap-2 bg-violet-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-violet-600 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:text-gray-500 transition-all duration-300 ease-in-out"
-                  >
-                    {isGeneratingImage ? (
-                      <><svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating...</>
-                    ) : (
-                      <><WandIcon className="w-5 h-5" /> Generate Image{numberOfImages > 1 ? 's' : ''}</>
-                    )}
-                  </button>
-                </div>
-                <div className="mt-4">
-                    <p className="text-xs text-gray-500 font-mono bg-gray-100 p-3 rounded-md border border-gray-200 break-words">{finalPrompt || 'Your final prompt will appear here.'}</p>
-                </div>
-              </div>
+              <button
+                onClick={handleGenerateImage}
+                disabled={isGeneratingImage}
+                className="w-full bg-violet-600 text-white text-lg font-bold py-4 px-6 rounded-xl hover:bg-violet-700 disabled:bg-gray-400 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3"
+              >
+                {isGeneratingImage ? (
+                  <>
+                    <Spinner />
+                    <span className="ml-2">Generating Image...</span>
+                  </>
+                ) : (
+                  <>
+                    <WandIcon className="w-6 h-6" />
+                    Generate Image
+                  </>
+                )}
+              </button>
             </div>
           )}
         </div>
