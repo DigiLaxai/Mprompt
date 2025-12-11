@@ -278,6 +278,16 @@ const App: React.FC = () => {
     }
   };
 
+  const handleCopyPrompt = () => {
+    if (!finalPrompt) return;
+    navigator.clipboard.writeText(finalPrompt).then(() => {
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+    });
+  };
+
   const handleGenerateImage = useCallback(async () => {
     if (!finalPrompt.trim()) return;
 
@@ -539,6 +549,36 @@ const App: React.FC = () => {
                     >
                         {[1, 2, 3, 4].map(num => <option key={num} value={num} className="bg-white text-gray-900">{num}</option>)}
                     </select>
+                </div>
+              </div>
+
+               {/* Full Prompt Preview & Copy */}
+               <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200">
+                <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <DocumentIcon className="w-4 h-4 text-violet-500"/>
+                        Full Prompt Preview
+                    </h3>
+                     <button
+                        onClick={handleCopyPrompt}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-md text-sm font-semibold transition-colors"
+                        title="Copy to clipboard"
+                    >
+                        {isCopied ? (
+                            <>
+                                <CheckIcon className="w-4 h-4" />
+                                <span>Copied</span>
+                            </>
+                        ) : (
+                            <>
+                                <CopyIcon className="w-4 h-4" />
+                                <span>Copy Prompt</span>
+                            </>
+                        )}
+                    </button>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg text-gray-700 text-sm leading-relaxed border border-gray-100 max-h-32 overflow-y-auto font-mono">
+                    {finalPrompt || <span className="text-gray-400 italic">Complete the descriptions above to generate a prompt...</span>}
                 </div>
               </div>
 
