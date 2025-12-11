@@ -183,6 +183,7 @@ const App: React.FC = () => {
       setSelectedFraming(defaultFraming);
       setSelectedLighting(defaultLighting);
       setPreserveFace(true);
+      setNumberOfImages(1);
         
       setStage('EDIT');
 
@@ -247,6 +248,7 @@ const App: React.FC = () => {
     setSelectedFraming(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
     setSelectedLighting(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
     setPreserveFace(true);
+    setNumberOfImages(1);
     setStage('INPUT');
     setGeneratedImages(null);
     setError(null);
@@ -488,7 +490,7 @@ const App: React.FC = () => {
               </div>
 
               {/* Style Controls */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Art Style</label>
                     <select 
@@ -526,6 +528,16 @@ const App: React.FC = () => {
                         className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-violet-500 bg-white text-gray-900"
                     >
                         {LIGHTING_OPTIONS.map(s => <option key={s} value={s} className="bg-white text-gray-900">{s}</option>)}
+                    </select>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Number of Images</label>
+                    <select 
+                        value={numberOfImages} 
+                        onChange={(e) => setNumberOfImages(Number(e.target.value))}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-violet-500 bg-white text-gray-900"
+                    >
+                        {[1, 2, 3, 4].map(num => <option key={num} value={num} className="bg-white text-gray-900">{num}</option>)}
                     </select>
                 </div>
               </div>
