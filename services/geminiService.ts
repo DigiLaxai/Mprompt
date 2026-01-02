@@ -32,15 +32,19 @@ interface AnalyzedPrompt {
     sceneDescription: string;
 }
 
-// System instruction for the Analysis step
-const analysisSystemInstruction = `You are an expert image analyst. Your task is to extract a physical description of the person in the image, STRICTLY separating their permanent physical identity from their temporary context.
+// System instruction for the Analysis step - Refined for high-detail identity extraction
+const analysisSystemInstruction = `You are a high-precision forensic artist and image analyst. Your task is to extract an extremely detailed physical description of the person in the image.
 
-1.  **characterDescription**: Describe ONLY the person's permanent physical traits: facial features, skin tone, eye color, hair color/texture, age, body shape, and ethnicity.
-    *   **CRITICAL**: Do NOT describe their clothing, hat, glasses (unless prescription), pose, facial expression, background, or lighting. Focus ONLY on the biological features.
-    *   Example: "A young woman with olive skin, almond-shaped brown eyes, and long wavy black hair."
+1.  **characterDescription**: Describe the person's biological identity with clinical precision. Include:
+    *   Specific eye shape (e.g., hooded, almond) and color.
+    *   Nose structure (e.g., bridge height, tip shape).
+    *   Jawline and cheekbone definition.
+    *   Exact skin undertone and texture.
+    *   Hair hairline, texture, and natural color.
+    *   Do NOT describe clothing or background.
 
-2.  **sceneDescription**: Describe the *current* context: clothing, accessories, pose, action, background, environment, lighting, and artistic style.
-    *   Example: "Wearing a red hoodie, standing in a crowded cyberpunk street, neon lighting, rain."
+2.  **sceneDescription**: Describe the temporary context:
+    *   Clothing, accessories, pose, action, background, environment, and current lighting.
 
 Return the result as a raw JSON object with keys "characterDescription" and "sceneDescription".`;
 
@@ -57,7 +61,7 @@ export const analyzeImageForPrompt = async (image: Image): Promise<AnalyzedPromp
     ]};
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-flash-preview",
         contents,
         config: {
             systemInstruction: analysisSystemInstruction,
@@ -103,63 +107,43 @@ export const generateImageFromPrompt = async (
     let contents;
 
     if (preserveFace) {
-        // We structure the prompt to explicitly tell the model that the IMAGE is for identity
-        // and the TEXT is for the scene/clothing.
         const finalPrompt = `
-        You are a professional digital artist executing a "Costume and Set Change".
-
-        SOURCE MATERIAL:
-        1. Reference Image (Attached): Use this STRICTLY for the person's face, hair, and body type (Identity).
-        2. Instructions (Text Below): Use this STRICTLY for the clothing, background, and action (Context).
-
-        TASK:
-        Generate a NEW image of the person from the Reference Image, but place them in the following context:
+        MANDATORY IDENTITY PRESERVATION TASK:
         
-        [NEW SCENE & OUTFIT]
-        "${components.scene}"
-
-        [CHARACTER IDENTITY]
-        (Maintain these traits from the image): "${components.character}"
-
-        [ARTISTIC STYLE]
-        ${components.style}
-
-        CRITICAL RULES:
-        1. **IGNORE THE ORIGINAL CLOTHES**: If the reference image has a suit, but the text says "t-shirt", you MUST generate a t-shirt.
-        2. **IGNORE THE ORIGINAL BACKGROUND**: Do not reproduce the background from the reference image.
-        3. **PRIORITY**: The Text Description overrides the Reference Image for all non-facial details.
+        REFERENCE SUBJECT: Attached Image.
+        
+        CORE REQUIREMENT: The output MUST feature the EXACT SAME person as the one in the attached image. Their facial structure, eyes, nose, mouth, skin tone, and unique biological identifiers must be indistinguishable from the reference.
+        
+        INSTRUCTIONS FOR TRANSFORMATION:
+        1. Keep the face and body type of the reference subject.
+        2. CHANGE the outfit, setting, and lighting based on the following:
+           - [SCENE & ACTION]: "${components.scene}"
+           - [STYLE]: ${components.style}
+        
+        BIOLOGICAL TRAITS TO MAINTAIN:
+        "${components.character}"
+        
+        This is a photo-consistent identity task. The output person should look like the reference subject has simply changed clothes and walked into a different room.
         `;
 
         contents = {
             parts: [
-                // Image first establishes the subject
                 {
                     inlineData: {
                         data: originalImage.data,
                         mimeType: originalImage.mimeType,
                     },
                 },
-                // Text second provides the directive for transformation
                 { text: finalPrompt },
             ],
         };
     } else {
-        // PURE TEXT GENERATION MODE
-        // We do not send the image, forcing the model to generate a new face based purely on the description.
         const finalPrompt = `
-        You are a professional digital artist.
-
-        TASK:
-        Generate an image based on the following description:
-
-        [SCENE & OUTFIT]
-        "${components.scene}"
-
-        [CHARACTER DESCRIPTION]
-        "${components.character}"
-
-        [ARTISTIC STYLE]
-        ${components.style}
+        Digital Portrait Task:
+        
+        [SUBJECT DESCRIPTION]: "${components.character}"
+        [SCENE & ACTION]: "${components.scene}"
+        [ARTISTIC STYLE]: ${components.style}
         `;
 
         contents = {
@@ -169,11 +153,15 @@ export const generateImageFromPrompt = async (
 
     const imagePromises = [];
     for (let i = 0; i < numberOfImages; i++) {
+        // Upgraded to Gemini 3 Pro Image for professional identity preservation
         imagePromises.push(ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
+            model: 'gemini-3-pro-image-preview',
             contents: contents,
             config: {
-                responseModalities: [Modality.IMAGE],
+                imageConfig: {
+                    aspectRatio: "1:1",
+                    imageSize: "1K"
+                }
             },
         }));
     }
@@ -188,11 +176,11 @@ export const generateImageFromPrompt = async (
                 mimeType: imagePart.inlineData.mimeType,
             };
         }
-        throw new Error('Image generation failed for one of the images.');
+        throw new Error('Image generation failed. Please try a different prompt.');
     });
 
     if (images.length !== numberOfImages) {
-      throw new Error('Image generation failed or not all images were returned from the API.');
+      throw new Error('Not all images were returned. The safety filter may have blocked some content.');
     }
     
     return images;
