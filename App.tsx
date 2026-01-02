@@ -34,6 +34,7 @@ type Image = { data: string; mimeType: string; };
 const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
 const CAMERA_FRAMING_OPTIONS = ['Full Shot', 'Medium Shot', 'Close-up', 'Extreme Close-up', 'None'];
 const LIGHTING_OPTIONS = ['Cinematic Lighting', 'Golden Hour', 'Studio Lighting', 'Backlit', 'None'];
+const RESOLUTION_OPTIONS = ['1K', '2K', '4K'];
 
 const getStyleSuffix = (style: string): string => {
   if (!style || style === 'None') return '';
@@ -64,6 +65,7 @@ const App: React.FC = () => {
   const [selectedStyle, setSelectedStyle] = useState(ART_STYLES[0]);
   const [selectedFraming, setSelectedFraming] = useState(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
   const [selectedLighting, setSelectedLighting] = useState(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
+  const [selectedResolution, setSelectedResolution] = useState(RESOLUTION_OPTIONS[0]);
   const [preserveFace, setPreserveFace] = useState(true);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -178,10 +180,12 @@ const App: React.FC = () => {
       const defaultStyle = ART_STYLES[0];
       const defaultFraming = CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1];
       const defaultLighting = LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1];
+      const defaultResolution = RESOLUTION_OPTIONS[0];
         
       setSelectedStyle(defaultStyle);
       setSelectedFraming(defaultFraming);
       setSelectedLighting(defaultLighting);
+      setSelectedResolution(defaultResolution);
       setPreserveFace(true);
       setNumberOfImages(1);
         
@@ -195,6 +199,7 @@ const App: React.FC = () => {
         selectedStyle: defaultStyle,
         selectedFraming: defaultFraming,
         selectedLighting: defaultLighting,
+        selectedResolution: defaultResolution,
         preserveFace: true,
       };
       const updatedHistory = [newHistoryItem, ...history.slice(0, 19)];
@@ -247,6 +252,7 @@ const App: React.FC = () => {
     setSelectedStyle(ART_STYLES[0]);
     setSelectedFraming(CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1]);
     setSelectedLighting(LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1]);
+    setSelectedResolution(RESOLUTION_OPTIONS[0]);
     setPreserveFace(true);
     setNumberOfImages(1);
     setStage('INPUT');
@@ -257,6 +263,7 @@ const App: React.FC = () => {
   const loadFromHistory = (item: HistoryItem) => {
     const framing = item.selectedFraming || CAMERA_FRAMING_OPTIONS[CAMERA_FRAMING_OPTIONS.length - 1];
     const lighting = item.selectedLighting || LIGHTING_OPTIONS[LIGHTING_OPTIONS.length - 1];
+    const resolution = item.selectedResolution || RESOLUTION_OPTIONS[0];
 
     setUploadedImage(item.uploadedImage);
     setCharacterDescription(item.characterDescription || '');
@@ -264,6 +271,7 @@ const App: React.FC = () => {
     setSelectedStyle(item.selectedStyle);
     setSelectedFraming(framing);
     setSelectedLighting(lighting);
+    setSelectedResolution(resolution);
     setPreserveFace(item.preserveFace ?? true);
     setGeneratedImages(item.generatedImages || null);
     setStage('EDIT');
@@ -311,7 +319,8 @@ const App: React.FC = () => {
         },
         uploadedImage, 
         numberOfImages,
-        preserveFace
+        preserveFace,
+        selectedResolution
       );
       setGeneratedImages(images);
       setIsModalOpen(true);
@@ -321,7 +330,7 @@ const App: React.FC = () => {
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [finalPrompt, uploadedImage, numberOfImages, characterDescription, basePrompt, selectedStyle, selectedFraming, selectedLighting, preserveFace, updateHistoryWithOptions]);
+  }, [finalPrompt, uploadedImage, numberOfImages, characterDescription, basePrompt, selectedStyle, selectedFraming, selectedLighting, selectedResolution, preserveFace, updateHistoryWithOptions]);
 
   const handleClearError = () => setError(null);
   
@@ -499,8 +508,8 @@ const App: React.FC = () => {
                 />
               </div>
 
-              {/* Style Controls */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Style & Quality Controls */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Art Style</label>
                     <select 
@@ -541,7 +550,20 @@ const App: React.FC = () => {
                     </select>
                 </div>
                 <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Number of Images</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Resolution</label>
+                    <select 
+                        value={selectedResolution} 
+                        onChange={(e) => {
+                            setSelectedResolution(e.target.value);
+                            updateHistoryWithOptions({ selectedResolution: e.target.value });
+                        }}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-violet-500 bg-white text-gray-900 font-bold text-violet-600"
+                    >
+                        {RESOLUTION_OPTIONS.map(s => <option key={s} value={s} className="bg-white text-gray-900">{s}</option>)}
+                    </select>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-md border border-gray-200">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Count</label>
                     <select 
                         value={numberOfImages} 
                         onChange={(e) => setNumberOfImages(Number(e.target.value))}
@@ -590,12 +612,12 @@ const App: React.FC = () => {
                 {isGeneratingImage ? (
                   <>
                     <Spinner />
-                    <span className="ml-2">Generating Image...</span>
+                    <span className="ml-2">Generating {selectedResolution} Image...</span>
                   </>
                 ) : (
                   <>
                     <WandIcon className="w-6 h-6" />
-                    Generate Image
+                    Generate {selectedResolution} Image
                   </>
                 )}
               </button>

@@ -102,6 +102,7 @@ export const generateImageFromPrompt = async (
     originalImage: Image,
     numberOfImages: number,
     preserveFace: boolean,
+    imageSize: string = "1K"
 ): Promise<{ data: string; mimeType: string; }[]> => {
     const ai = getAIClient();
     let contents;
@@ -160,7 +161,7 @@ export const generateImageFromPrompt = async (
             config: {
                 imageConfig: {
                     aspectRatio: "1:1",
-                    imageSize: "1K"
+                    imageSize: imageSize as any
                 }
             },
         }));

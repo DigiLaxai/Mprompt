@@ -6,6 +6,7 @@ export interface HistoryItem {
     selectedStyle: string;
     selectedFraming: string;
     selectedLighting: string;
+    selectedResolution?: string;
     generatedImages?: { data: string; mimeType: string; }[] | null;
     characterDescription?: string;
     preserveFace?: boolean;
