@@ -31,7 +31,7 @@ declare global {
 type Stage = 'INPUT' | 'EDIT';
 type Image = { data: string; mimeType: string; };
 
-const ART_STYLES = ['Photorealistic', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
+const ART_STYLES = ['Photorealistic', '3D Pixar Style', 'Illustration', 'Anime', 'Oil Painting', 'Pixel Art', 'None'];
 const CAMERA_FRAMING_OPTIONS = ['Full Shot', 'Medium Shot', 'Close-up', 'Extreme Close-up', 'None'];
 const LIGHTING_OPTIONS = ['Cinematic Lighting', 'Golden Hour', 'Studio Lighting', 'Backlit', 'None'];
 const RESOLUTION_OPTIONS = ['1K', '2K', '4K'];
