@@ -307,15 +307,14 @@ const App: React.FC = () => {
     setIsGeneratingImage(true);
     setError(null);
     try {
-      // Construct the style suffix
-      const styleSuffix = getStyleSuffix(selectedStyle) + getFramingSuffix(selectedFraming) + getLightingSuffix(selectedLighting);
-
       // Pass components separately for better control in generation
       const images = await generateImageFromPrompt(
         {
           character: characterDescription,
           scene: basePrompt,
-          style: styleSuffix
+          style: selectedStyle,
+          framing: selectedFraming,
+          lighting: selectedLighting
         },
         uploadedImage, 
         numberOfImages,

@@ -95,6 +95,8 @@ export interface PromptComponents {
     character: string;
     scene: string;
     style: string;
+    framing?: string;
+    lighting?: string;
 }
 
 export const generateImageFromPrompt = async (
@@ -107,25 +109,58 @@ export const generateImageFromPrompt = async (
     const ai = getAIClient();
     let contents;
 
+    const style = components.style || "None";
+    const framing = components.framing || "None";
+    const lighting = components.lighting || "None";
+
+    const isArtStyle = style !== "None" && style !== "Photorealistic";
+
+    let styleAndSetup = "";
+    if (isArtStyle) {
+        styleAndSetup += `
+        ART STYLE AND RENDERING MANDATE:
+        - The absolute target art style is: **${style}**.
+        - Render the entire image, subject, clothing, face, and background, strictly in this ${style} style. 
+        - Transform the reference subject's face, hair, and features seamlessly to fully fit this ${style} artistic style, while preserving their unique likeness, bone structure, and identity attributes. Do not render a realistic photo if the style is ${style}!`;
+    } else if (style === "Photorealistic") {
+        styleAndSetup += `
+        ART STYLE AND RENDERING MANDATE:
+        - The target style is: High-quality, lifelike, photorealistic professional portrait photography.
+        - Render realistic textures, hair strands, and skin details.`;
+    }
+
+    if (framing && framing !== "None") {
+        styleAndSetup += `\n        - CAMERA SHOT TYPE: Use a ${framing.toLowerCase()} composition.`;
+    }
+    if (lighting && lighting !== "None") {
+        styleAndSetup += `\n        - LIGHTING SETUP: Apply a ${lighting.toLowerCase()} lighting environment.`;
+    }
+
     if (preserveFace) {
-        const finalPrompt = `
-        MANDATORY IDENTITY PRESERVATION TASK:
+        let finalPrompt = `
+        MANDATORY IDENTITY PRESERVATION & STYLE TRANSFORMATION TASK:
         
         REFERENCE SUBJECT: Attached Image.
         
-        CORE REQUIREMENT: The output MUST feature the EXACT SAME person as the one in the attached image. Their facial structure, eyes, nose, mouth, skin tone, and unique biological identifiers must be indistinguishable from the reference.
+        CORE REQUIREMENT: The output MUST feature the same recognizable human subject as the one in the attached reference image. Keep their specific facial features, eyes, nose, mouth shape, and unique biological identity recognizable.
+        
+        ${styleAndSetup}
         
         INSTRUCTIONS FOR TRANSFORMATION:
-        1. Keep the face and body type of the reference subject.
-        2. CHANGE the outfit, setting, and lighting based on the following:
+        1. Fully respect the selected style and scene details above.
+        2. Keep the core structural face and identity of the reference subject.
+        3. Place the subject in:
            - [SCENE & ACTION]: "${components.scene}"
-           - [STYLE]: ${components.style}
         
-        BIOLOGICAL TRAITS TO MAINTAIN:
+        BIOLOGICAL TRAITS TO INTEGRATE AND MAINTAIN:
         "${components.character}"
-        
-        This is a photo-consistent identity task. The output person should look like the reference subject has simply changed clothes and walked into a different room.
         `;
+        
+        if (!isArtStyle) {
+            finalPrompt += `\n        This is a photo-consistent identity task. The output person should look like the reference subject has simply changed clothes and walked into a different room with the specified lighting and camera framing.`;
+        } else {
+            finalPrompt += `\n        Because an artistic style (${style}) is active, do not make it a realistic photo. Redraw their face and features to perfectly match the ${style} format, keeping their identity recognizable within that artistic style.`;
+        }
 
         contents = {
             parts: [
@@ -140,11 +175,12 @@ export const generateImageFromPrompt = async (
         };
     } else {
         const finalPrompt = `
-        Digital Portrait Task:
+        Artistic Portrait Generation Task:
         
         [SUBJECT DESCRIPTION]: "${components.character}"
         [SCENE & ACTION]: "${components.scene}"
-        [ARTISTIC STYLE]: ${components.style}
+        
+        ${styleAndSetup}
         `;
 
         contents = {
@@ -156,7 +192,7 @@ export const generateImageFromPrompt = async (
     for (let i = 0; i < numberOfImages; i++) {
         // Upgraded to Gemini 3 Pro Image for professional identity preservation
         imagePromises.push(ai.models.generateContent({
-            model: 'gemini-3-pro-image-preview',
+            model: 'gemini-3-pro-image',
             contents: contents,
             config: {
                 imageConfig: {
